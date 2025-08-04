@@ -1,0 +1,19 @@
+html {
+    background:#f7f7f7;
+}
+body {
+    background:#f7f7f7;
+}
+.navbar{
+    background:#444;
+}
+.content{
+    padding:20px;
+    background:#ffffff;
+}
+#footer{
+    bottom:0px;
+    margin-top:30px;
+    background:#FFF;
+    padding:10px;
+}
