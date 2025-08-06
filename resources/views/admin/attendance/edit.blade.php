@@ -3,7 +3,7 @@
 @section('content')
 <!-- Page Heading -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <a href="{{ url('attendance') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
+    <a href="{{ route('admin.attendances.index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
     <h1 class="h3 text-gray-800">Edit Attendance</h1>
     <div></div> <!-- Spacer for alignment -->
 </div>
@@ -11,13 +11,13 @@
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
     <div class="card-body">
-        <form action="{{ url('attendance') }}/{{ $attendance->id }}" method="POST">
+        <form action="{{ route('admin.attendances.update', $attendance->id) }}" method="POST">
             @method('PUT')
             @csrf
             <div class="row">
                 <!-- User Selection -->
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Employee</label>
+                    <label class="form-label">Employee *</label>
                     <select name="user_id" class="form-control" required>
                         @foreach($users as $user)
                         <option value="{{ $user->id }}" {{ $attendance->user_id == $user->id ? 'selected' : '' }}>
@@ -29,20 +29,20 @@
 
                 <!-- Date and Time -->
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Date</label>
+                    <label class="form-label">Date *</label>
                     <input type="date" class="form-control" name="present_date" 
-                           value="{{ $attendance->present_at->format('Y-m-d') }}" required>
+                           value="{{ old('present_date', $attendance->present_at->format('Y-m-d')) }}" required>
                 </div>
 
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Time</label>
+                    <label class="form-label">Time *</label>
                     <input type="time" class="form-control" name="present_time" 
-                           value="{{ $attendance->present_at->format('H:i') }}" required>
+                           value="{{ old('present_time', $attendance->present_at->format('H:i')) }}" required>
                 </div>
 
                 <!-- Attendance Status -->
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label">Status *</label>
                     <select name="description" class="form-control" required>
                         <option value="Hadir" {{ $attendance->description == 'Hadir' ? 'selected' : '' }}>Hadir</option>
                         <option value="Terlambat" {{ $attendance->description == 'Terlambat' ? 'selected' : '' }}>Terlambat</option>
@@ -56,20 +56,30 @@
                 <!-- Location Information -->
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Latitude</label>
-                    <input type="text" class="form-control" name="latitude" 
-                           value="{{ $attendance->latitude }}" placeholder="e.g., -6.906000">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="latitude" id="latitude" 
+                               value="{{ old('latitude', $attendance->latitude ?? '-6.906000') }}" placeholder="e.g., -6.906000">
+                        <button type="button" class="btn btn-outline-primary" onclick="getCurrentLocation()">
+                            <i class="fas fa-location-arrow"></i> Current
+                        </button>
+                    </div>
                 </div>
 
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Longitude</label>
-                    <input type="text" class="form-control" name="longitude" 
-                           value="{{ $attendance->longitude }}" placeholder="e.g., 107.623400">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="longitude" id="longitude" 
+                               value="{{ old('longitude', $attendance->longitude ?? '107.623400') }}" placeholder="e.g., 107.623400">
+                        <button type="button" class="btn btn-outline-primary" onclick="getCurrentLocation()">
+                            <i class="fas fa-location-arrow"></i> Current
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Map Preview -->
+                <!-- Map Picker -->
                 <div class="col-12 mb-3">
-                    <div id="mapPreview" style="height: 300px; width: 100%; border-radius: 8px;"></div>
-                    <small class="text-muted">Location preview (SMKN 2 Bandung shown as red marker)</small>
+                    <div id="mapPicker" style="height: 400px; width: 100%; border-radius: 8px;"></div>
+                    <small class="text-muted">Click on the map to select location or use current location</small>
                 </div>
 
                 <!-- Submit Button -->
@@ -90,54 +100,77 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// Initialize map for location preview
-function initMapPreview() {
-    // Default coordinates (use attendance location or school location as fallback)
-    const defaultLat = {{ $attendance->latitude ?? -6.906000 }};
-    const defaultLng = {{ $attendance->longitude ?? 107.623400 }};
+// Initialize map for location picking
+let map;
+let marker;
+let circle;
+
+function initMapPicker() {
+    // Use existing location or default to school location
+    const initialLat = parseFloat(document.getElementById('latitude').value) || -6.906000;
+    const initialLng = parseFloat(document.getElementById('longitude').value) || 107.623400;
     
-    const map = L.map('mapPreview').setView([defaultLat, defaultLng], 15);
+    map = L.map('mapPicker').setView([initialLat, initialLng], 15);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // School marker
-    const schoolIcon = L.divIcon({
-        html: '<i class="fas fa-school" style="color: #e63946; font-size: 24px;"></i>',
-        iconSize: [24, 24],
-        className: 'custom-div-icon'
-    });
+    // Add marker for selected location
+    marker = L.marker([initialLat, initialLng], {
+        draggable: true
+    }).addTo(map);
     
-    L.marker([-6.906000, 107.623400], {icon: schoolIcon})
-        .addTo(map)
-        .bindPopup('<b>SMKN 2 Bandung</b>');
-
-    // Add attendance location marker if available
-    @if($attendance->latitude && $attendance->longitude)
-    const userIcon = L.divIcon({
-        html: '<i class="fas fa-map-marker-alt" style="color: #007bff; font-size: 24px;"></i>',
-        iconSize: [24, 24],
-        className: 'custom-div-icon'
-    });
-    
-    L.marker([{{ $attendance->latitude }}, {{ $attendance->longitude }}], {icon: userIcon})
-        .addTo(map)
-        .bindPopup('Attendance Location');
-    @endif
-
-    // Add radius circle (500m)
-    L.circle([-6.906000, 107.623400], {
+    // Add circle for valid radius
+    circle = L.circle([-6.906000, 107.623400], {
         color: 'blue',
         fillColor: '#0066cc',
         fillOpacity: 0.1,
         radius: 500
     }).addTo(map).bindPopup('Valid Attendance Radius (500m)');
+
+    // Update form fields when marker is moved
+    marker.on('dragend', function(e) {
+        const position = marker.getLatLng();
+        document.getElementById('latitude').value = position.lat.toFixed(6);
+        document.getElementById('longitude').value = position.lng.toFixed(6);
+        map.setView(position);
+    });
+
+    // Add click event to update marker position
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    });
+}
+
+// Get current location
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                document.getElementById('latitude').value = lat.toFixed(6);
+                document.getElementById('longitude').value = lng.toFixed(6);
+                
+                marker.setLatLng([lat, lng]);
+                map.setView([lat, lng], 15);
+            },
+            function(error) {
+                alert('Error getting location: ' + error.message);
+            }
+        );
+    } else {
+        alert('Geolocation is not supported by this browser.');
+    }
 }
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    initMapPreview();
+    initMapPicker();
     
     // Combine date and time fields into present_at before submission
     const form = document.querySelector('form');
@@ -146,10 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const time = document.querySelector('input[name="present_time"]').value;
         
         // Create a hidden input for present_at
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'present_at';
-        hiddenInput.value = `${date} ${time}:00`;
+        
         
         form.appendChild(hiddenInput);
     });
@@ -157,13 +187,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.custom-div-icon {
-    background: transparent;
-    border: none;
-}
-#mapPreview {
+#mapPicker {
     border: 1px solid #ddd;
+    margin-bottom: 10px;
+}
+.leaflet-marker-draggable {
+    cursor: move;
 }
 </style>
-
 @endsection

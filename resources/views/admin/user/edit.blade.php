@@ -3,7 +3,7 @@
 @section('content')
 
 <!-- Page Heading -->
-<a href="{{ url('user') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
+<a href="{{ route('admin.users.index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
 
 <h1 class="h3 m-4 text-gray-800">Edit users</h1>
 

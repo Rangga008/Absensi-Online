@@ -15,9 +15,9 @@ class ConcessionController extends Controller
      */
     public function index()
     {
-        if (!session()->has('username')) {
-            return back();
-        }
+        if (!session()->has('admin_id')) {
+        return redirect('/admin/login')->with('error', 'Please login first');
+    }
         $concessions = Concession::orderBy('created_at', 'desc')->paginate(10);
         return view('admin.concession.index', compact('concessions'));
     }

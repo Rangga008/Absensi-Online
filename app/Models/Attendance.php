@@ -130,7 +130,7 @@ class Attendance extends Model
     }
 
     // Calculate distance between two coordinates using Haversine formula
-    private function calculateDistance($lat1, $lng1, $lat2, $lng2)
+    public static function calculateDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $earthRadius = 6371000; // Earth radius in meters
 

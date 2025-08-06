@@ -3,117 +3,186 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use Illuminate\Http\Request;
-use Alert;
 use App\Models\Role;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
-        if (!session()->has('username')) {
-            return back();
-        }
-        $users = User::orderBy('created_at', 'desc')->paginate(5);
-        return view('admin.user.index', compact('users'));
+    public function index(Request $request)
+{
+    // Check admin session
+    if (!session('is_admin') || !session('admin_id')) {
+        return redirect()->route('admin.login')->with('message', 'Please login as admin');
     }
+    
+    try {
+        $sortColumn = $request->get('sort', 'name');
+        $sortDirection = $request->get('direction', 'asc');
+        
+        $users = User::with('role')
+            ->orderBy($sortColumn, $sortDirection)
+            ->paginate(10);
+            
+        if ($request->ajax()) {
+            return response()->json([
+                'users' => $users->items(),
+                'pagination' => $users->links()->toHtml()
+            ]);
+        }
+        
+        return view('admin.user.index', compact('users'));
+    } catch (\Exception $e) {
+        Log::error('Error loading users', ['error' => $e->getMessage()]);
+        
+        if ($request->ajax()) {
+            return response()->json(['error' => 'Error loading data'], 500);
+        }
+        
+        return back()->with('error', 'Error loading users: ' . $e->getMessage());
+    }
+}
 
     /**
      * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
      */
     public function create()
     {
-        return view('admin.user.create');
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+        
+        try {
+            $roles = Role::all();
+            return view('admin.user.create', compact('roles'));
+        } catch (\Exception $e) {
+            Log::error('Error loading create form', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error loading form: ' . $e->getMessage());
+        }
     }
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|min:5',
-            'phone' => 'required|min:12',
-            'password' => 'required|min:5',
+            'name' => 'required|string|min:3|max:255',
+            'phone' => 'required|string|min:10|max:15',
+            'password' => 'required|string|min:6',
             'email' => 'required|email|unique:users,email',
-            'address' => 'required',
+            'address' => 'required|string|max:500',
+            'role_id' => 'required|exists:roles,id'
         ]);
 
-        User::create([
-            'name' => $request->name,
-            'phone' => $request->phone,
-            'password' => password_hash($request->password, PASSWORD_DEFAULT),
-            'email' => $request->email,
-            'role_id' => $request->role_id,
-            'address' => $request->address,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        try {
+            User::create([
+                'name' => $request->name,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'email' => $request->email,
+                'role_id' => $request->role_id,
+                'address' => $request->address,
+            ]);
 
-        return redirect('/user')->with('message', 'User has been added!');
+            return redirect()->route('admin.users.index')->with('success', 'User has been created successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error creating user', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error creating user: ' . $e->getMessage())->withInput();
+        }
     }
 
     /**
      * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function show($id)
     {
-        //
+        try {
+            $user = User::with('role')->findOrFail($id);
+            return view('admin.user.show', compact('user'));
+        } catch (\Exception $e) {
+            Log::error('Error showing user', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'User not found');
+        }
     }
 
     /**
      * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function edit($id)
     {
-        $user = User::find($id);
-        $roles = Role::all();
-        return view('admin.user.edit', compact('user', 'roles'));
+        try {
+            $user = User::findOrFail($id);
+            $roles = Role::all();
+            return view('admin.user.edit', compact('user', 'roles'));
+        } catch (\Exception $e) {
+            Log::error('Error loading edit form', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'User not found');
+        }
     }
 
     /**
      * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id)
     {
-        User::where('id', $id)->update([
-            'name' => $request->name,
-            'phone' => $request->phone,
-            'email' => $request->email,
-            'address' => $request->address,
-            'role_id' => $request->role_id,
+        $request->validate([
+            'name' => 'required|string|min:3|max:255',
+            'phone' => 'required|string|min:10|max:15',
+            'email' => 'required|email|unique:users,email,' . $id,
+            'address' => 'required|string|max:500',
+            'role_id' => 'required|exists:roles,id',
+            'password' => 'nullable|string|min:6'
         ]);
-        return redirect('user')->with('message', 'User has been updated!');
+
+        try {
+            $user = User::findOrFail($id);
+            
+            $updateData = [
+                'name' => $request->name,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'address' => $request->address,
+                'role_id' => $request->role_id,
+            ];
+
+            // Only update password if provided
+            if ($request->filled('password')) {
+                $updateData['password'] = Hash::make($request->password);
+            }
+
+            $user->update($updateData);
+
+            return redirect()->route('admin.users.index')->with('success', 'User has been updated successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error updating user', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error updating user: ' . $e->getMessage())->withInput();
+        }
     }
 
     /**
      * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function destroy($id)
     {
-        User::where('id', $id)->delete();
-        return redirect('user')->with('message', 'User has been deleted!');
+        try {
+            $user = User::findOrFail($id);
+            
+            // Prevent deleting admin user
+            if ($user->role_id == 1 && User::where('role_id', 1)->count() <= 1) {
+                return back()->with('error', 'Cannot delete the last admin user');
+            }
+            
+            $user->delete();
+            
+            return redirect()->route('admin.users.index')->with('success', 'User has been deleted successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error deleting user', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error deleting user: ' . $e->getMessage());
+        }
     }
 }

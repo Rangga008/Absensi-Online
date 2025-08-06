@@ -2,7 +2,7 @@
 <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
     <!-- Sidebar - Brand -->
-    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('admin.dashboard') }}">
         <div class="sidebar-brand-text mx-3">Presensi Online <small> PT. Codepolitan </small></div><br>
     </a>
 
@@ -10,8 +10,8 @@
     <hr class="sidebar-divider my-0">
 
     <!-- Nav Item - Dashboard -->
-    <li class="nav-item {{ (request()->segment(1) == 'dashboard') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('dashboard') }}">
+    <li class="nav-item {{ request()->is('admin/dashboard') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.dashboard') }}">
             <i class="fas fa-fw fa-tachometer-alt"></i>
             <span>Dashboard</span></a>
     </li>
@@ -24,60 +24,63 @@
         Management
     </div>
     @if(session('role_id') == 1)
-    <!-- Nav Item - Charts -->
-    <li class="nav-item {{ (request()->segment(1) == 'user') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('user') }}">
+    <!-- Nav Item - Users -->
+    <li class="nav-item {{ request()->is('admin/users*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.users.index') }}">
             <i class="fas fa-fw fa-users"></i>
             <span>Users</span></a>
     </li>
 
-    <!-- Nav Item - Charts -->
-    <li class="nav-item {{ (request()->segment(1) == 'attendance') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('attendance') }}">
+    <!-- Nav Item - Attendance -->
+    <li class="nav-item {{ request()->is('admin/attendances*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.attendances.index') }}">
             <i class="fas fa-fw fa-user"></i>
             <span>Attendance</span></a>
     </li>
 
-    
-    <li class="nav-item {{ (request()->segment(1) == 'role') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('role') }}">
+    <!-- Nav Item - Roles -->
+    <li class="nav-item {{ request()->is('admin/roles*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.roles.index') }}">
             <i class="fas fa-fw fa-lock"></i>
             <span>Roles</span></a>
     </li>
-    <li class="nav-item {{ (request()->segment(1) == 'concession') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('concession') }}">
+
+    <!-- Nav Item - Concession -->
+    <li class="nav-item {{ request()->is('admin/concessions*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.concessions.index') }}">
             <i class="fas fa-fw fa-edit"></i>
             <span>Concession</span></a>
     </li>
 
-    <li class="nav-item {{ (request()->segment(1) == 'salary') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('salary') }}">
-            <i class="fas fa-fw fa-dollar-sign"></i>
-            <span>Salary</span></a>
-    </li>
     @endif
 
     @if(session('role_id') == 2)
-    <li class="nav-item {{ (request()->segment(1) == 'salary') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('salary') }}">
+    <!-- Nav Item - Salary -->
+    <li class="nav-item {{ request()->is('admin/salaries*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.salaries.index') }}">
             <i class="fas fa-fw fa-dollar-sign"></i>
             <span>Salary</span></a>
     </li>
-    <li class="nav-item {{ (request()->segment(1) == 'attendance') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('attendance') }}">
+
+    <!-- Nav Item - Report Attendance -->
+    <li class="nav-item {{ request()->is('admin/attendances*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.attendances.index') }}">
             <i class="fas fa-fw fa-user"></i>
             <span>Report Attendance</span></a>
     </li>
     @endif
 
     @if(session('role_id') == 3)
-    <li class="nav-item {{ (request()->segment(1) == 'attendance') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('attendance') }}">
+    <!-- Nav Item - Report Attendance -->
+    <li class="nav-item {{ request()->is('admin/attendances*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.attendances.index') }}">
             <i class="fas fa-fw fa-user"></i>
             <span>Report Attendance</span></a>
     </li>
-    <li class="nav-item {{ (request()->segment(1) == 'concession') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ url('concession') }}">
+
+    <!-- Nav Item - Report Concession -->
+    <li class="nav-item {{ request()->is('admin/concessions*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.concessions.index') }}">
             <i class="fas fa-fw fa-edit"></i>
             <span>Report Concession</span></a>
     </li>
@@ -85,12 +88,15 @@
 
     <hr class="sidebar-divider d-none d-md-block">
 
-    <!-- Nav Item - Tables -->
+    <!-- Nav Item - Logout -->
     <li class="nav-item">
-        <a class="nav-link" href="{{ url('logout') }}">
-            <i class="fas fa-fw fa-sign-out-alt"></i>
-            <span>Logout</span></a>
+            <a class="nav-link" href="{{ url('admin.logout') }}" data-toggle="modal" data-target="#logoutModal">
+                                     <i class="fas fa-fw fa-sign-out-alt"></i>
+                                    Logout
+                                </a>
     </li>
+
+    
 
     <!-- Divider -->
     <hr class="sidebar-divider d-none d-md-block">

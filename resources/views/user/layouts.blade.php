@@ -6,6 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
 
     <!-- Custom fonts for this template-->
     <link href="{{ asset('sbadmin') }}/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
@@ -30,7 +31,7 @@
 
     <div id="footer">
         <div class="text-center mt-5">
-            Copyright &copy; 2021 Alfian Pratama
+            Copyright &copy; 2025 K
         </div>
     </div>
 

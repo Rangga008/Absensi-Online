@@ -13,13 +13,15 @@ class RoleController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function index()
-    {
-        if (!session()->has('username')) {
-            return back();
-        }
-        $roles = Role::all();
-        return view('admin.role.index', compact('roles'));
+{
+    // Change from checking 'username' to 'admin_id'
+    if (!session()->has('admin_id')) {
+        return redirect('/admin/login')->with('error', 'Please login first');
     }
+    
+    $roles = Role::all();
+    return view('admin.role.index', compact('roles'));
+}
 
     /**
      * Show the form for creating a new resource.

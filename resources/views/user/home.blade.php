@@ -48,9 +48,11 @@
 <div class="mt-3">
     <a href="{{ url('user/attendance') }}" class="btn btn-primary btn-block m-1">Absen Online</a>
     <a href="{{ url('user/concession') }}" class="btn btn-primary btn-block m-1">Izin Online</a>
-    <a href="{{ url('user/salary') }}" class="btn btn-primary btn-block m-1">Lihat Gaji</a>
     <a href="{{ url('user/history') }}" class="btn btn-primary btn-block m-1">History Absen</a>
-    <a href="{{ url('user/logout') }}" class="btn btn-danger btn-block m-1 mt-4">Logout</a>
+    <form action="{{ route('user.logout') }}" method="POST" class="d-inline">
+        @csrf
+        <button type="submit" class="btn btn-danger btn-block m-1 mt-4">Logout</button>
+    </form>
 </div>
 
 @endsection

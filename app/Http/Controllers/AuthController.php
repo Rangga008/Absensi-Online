@@ -4,11 +4,19 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
     public function index()
     {
+        // Redirect if already logged in as admin
+        if (session('is_admin') && session('admin_id')) {
+            return redirect()->route('admin.dashboard');
+        }
+        
         return view('auth.login');
     }
 
@@ -32,40 +40,71 @@ class AuthController extends Controller
             'name' => $request->name,
             'phone' => $request->phone,
             'email' => $request->email,
-            'password' => password_hash($request->password, PASSWORD_DEFAULT),
+            'password' => Hash::make($request->password), // Use Hash::make instead
             'address' => $request->address,
             'role_id' => 1,
         ]);
 
-        return redirect('/admin')->with('success', 'New user has been created!');
+        return redirect()->route('admin.login')->with('success', 'New user has been created!');
     }
 
     public function doLogin(Request $request)
     {
         $request->validate([
-            'email' => 'required',
-            'password' => 'required',
+            'email' => 'required|email',
+            'password' => 'required'
         ]);
 
-        $user = User::where('email', $request->email)->get()->first();
+        $user = User::where('email', $request->email)->first();
 
-        if (isset($user)) {
-            if (password_verify($request->password, $user->password)) {
-                $request->session()->put('username', $user->name);
-                $request->session()->put('role_id', $user->role_id);
-                return redirect('dashboard')->with('message', 'Welcome <strong>' . $user->name . '</strong>');
-            } else {
-                return redirect('/admin')->with('message', 'Wrong password!');
-            }
-        } else {
-            return redirect('/admin')->with('message', 'Email not found!');
+        if (!$user) {
+            return back()->with('message', 'Email not found');
         }
+
+        if (!Hash::check($request->password, $user->password)) {
+            return back()->with('message', 'Incorrect password');
+        }
+
+        if ($user->role_id != 1) {
+            return back()->with('message', 'Not authorized as admin');
+        }
+
+        // Clear any existing session data
+        $request->session()->flush();
+        
+        // Regenerate session ID for security
+        $request->session()->regenerate();
+        
+        // Set admin session data
+        $request->session()->put([
+            'admin_id' => $user->id,
+            'admin_name' => $user->name,
+            'admin_email' => $user->email,
+            'role_id' => $user->role_id,
+            'is_admin' => true
+        ]);
+
+        // Force session save
+        $request->session()->save();
+
+        Log::info('Admin login successful', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'session_data' => $request->session()->all()
+        ]);
+
+        // Use different redirect method
+        return redirect()->intended(route('admin.dashboard'));
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
-        session()->forget('username');
-        session()->forget('role_id');
-        return redirect('/admin')->with('success', 'You have been logout!');
+        Log::info('Admin logout', ['admin_id' => session('admin_id')]);
+        
+        // Clear session
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        
+        return redirect()->route('admin.login')->with('success', 'Successfully logged out');
     }
 }

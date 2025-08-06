@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@tailwind utilities;
+
+/* Custom styles */
+.smk-bg-gradient {
+    @apply bg-gradient-to-r from-smk-blue to-blue-900;
+}
+
+.btn-smk {
+    @apply bg-smk-blue hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 shadow-md;
+}

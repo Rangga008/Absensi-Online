@@ -62,6 +62,7 @@
         <input type="hidden" id="user_id" value="{{ session('user_id') }}">
         <input type="hidden" id="user_lat" value="">
         <input type="hidden" id="user_lng" value="">
+        <input type="hidden" id="request_id" value="">
         
         <div class="form-group mb-3">
             <label for="description"><strong>Keterangan Absensi:</strong></label>
@@ -74,7 +75,7 @@
                 <option value="Dinas Luar">Dinas Luar</option>
                 <option value="WFH">Work From Home</option>
             </select>
-            <small class="form-text text-muted">
+            <small class="form-text text-muted" id="description-info">
                 <i class="fas fa-info-circle"></i> 
                 Status Sakit, Izin, dan WFH tidak memerlukan validasi lokasi
             </small>
@@ -95,27 +96,35 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+// Constants
+const OFFICE_LAT = -6.906000000000;
+const OFFICE_LNG = 107.623400000000;
+const MAX_DISTANCE = 50000; // 50km maximum distance in meters
+const MIN_ACCURACY = 100; // Minimum acceptable accuracy in meters
+const DEBOUNCE_TIME = 500; // Debounce time in ms
+const LOCATION_REFRESH_INTERVAL = 30000; // 30 seconds
+const ATTENDANCE_CHECK_INTERVAL = 15000; // 15 seconds
+
+// Global variables
 let map;
 let userMarker;
 let officeMarker;
-let userLat, userLng;
-let userAccuracy = 0;
-
-// Koordinat SMKN 2 Bandung
-const OFFICE_LAT = -6.906000000000;
-const OFFICE_LNG = 107.623400000000;
-const MAX_DISTANCE = 10000; // Maximum distance in meters
+let accuracyCircle;
+let userLat, userLng, userAccuracy;
+let isSubmittingAttendance = false;
+let hasAttendedToday = false;
+let attendanceProcessed = false;
+let debounceTimer = null;
 
 // Initialize map
 function initMap() {
-    // Default view ke lokasi sekolah
     map = L.map('map').setView([OFFICE_LAT, OFFICE_LNG], 15);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Marker sekolah
+    // School marker
     const schoolIcon = L.divIcon({
         html: '<i class="fas fa-school" style="color: #e63946; font-size: 24px;"></i>',
         iconSize: [24, 24],
@@ -139,52 +148,53 @@ function initMap() {
     }).addTo(map).bindPopup('Area Absensi (Radius ' + MAX_DISTANCE + ' meter)');
 }
 
+// Get user location with high accuracy
 function getUserLocation() {
-    if (navigator.geolocation) {
-        document.getElementById('location-status').innerHTML = 
-            '<i class="fas fa-spinner fa-spin"></i> Mengambil lokasi Anda...';
-        
-        const options = {
-            enableHighAccuracy: true,  // Gunakan GPS jika tersedia
-            timeout: 20000,           // Timeout 20 detik
-            maximumAge: 0             // Jangan gunakan cache lokasi lama
-        };
-        
-        const watchId = navigator.geolocation.watchPosition(
-            function(position) {
-                // Hentikan pemantauan setelah mendapatkan lokasi akurat
-                if (position.coords.accuracy <= 100) {
-                    navigator.geolocation.clearWatch(watchId);
-                }
-                
-                userLat = position.coords.latitude;
-                userLng = position.coords.longitude;
-                userAccuracy = position.coords.accuracy;
-                
-                // Update lokasi
-                updateUserLocation(userLat, userLng, userAccuracy);
-            },
-            function(error) {
-                navigator.geolocation.clearWatch(watchId);
-                handleLocationError(error);
-            },
-            options
-        );
-        
-        // Timeout tambahan untuk kasus watchPosition tidak merespon
-        setTimeout(() => {
-            navigator.geolocation.clearWatch(watchId);
-            if (!userLat) {
-                handleLocationError({code: 3, message: "Timeout mendapatkan lokasi"});
-            }
-        }, 25000);
-    } else {
+    if (!navigator.geolocation) {
         handleLocationError({code: 0, message: "Browser tidak mendukung geolokasi"});
+        return;
     }
+    
+    updateLocationStatus('Mengambil lokasi Anda...', 'info', 'fa-spinner fa-spin');
+    
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
+    };
+    
+    const watchId = navigator.geolocation.watchPosition(
+        position => handleLocationSuccess(position, watchId),
+        handleLocationError,
+        options
+    );
+    
+    // Fallback timeout
+    setTimeout(() => {
+        navigator.geolocation.clearWatch(watchId);
+        if (!userLat) {
+            handleLocationError({code: 3, message: "Timeout mendapatkan lokasi"});
+        }
+    }, 25000);
 }
 
+// Handle successful location retrieval
+function handleLocationSuccess(position, watchId = null) {
+    // Stop watching if we have accurate enough location
+    if (position.coords.accuracy <= MIN_ACCURACY && watchId) {
+        navigator.geolocation.clearWatch(watchId);
+    }
+    
+    userLat = position.coords.latitude;
+    userLng = position.coords.longitude;
+    userAccuracy = position.coords.accuracy;
+    
+    updateUserLocation(userLat, userLng, userAccuracy);
+}
+
+// Update UI with new location data
 function updateUserLocation(lat, lng, accuracy) {
-    // Update hidden inputs
+    // Update form inputs
     document.getElementById('user_lat').value = lat;
     document.getElementById('user_lng').value = lng;
     
@@ -193,7 +203,7 @@ function updateUserLocation(lat, lng, accuracy) {
     document.getElementById('current-lng').textContent = lng.toFixed(6);
     document.getElementById('accuracy').textContent = Math.round(accuracy);
     
-    // Add/update user marker
+    // Update or create user marker
     if (userMarker) {
         map.removeLayer(userMarker);
     }
@@ -208,34 +218,37 @@ function updateUserLocation(lat, lng, accuracy) {
         .addTo(map)
         .bindPopup(`<b>Lokasi Anda</b><br><small>Akurasi: ±${Math.round(accuracy)} meter</small>`);
     
-    // Add accuracy circle
-    L.circle([lat, lng], {
+    // Update accuracy circle
+    if (accuracyCircle) {
+        map.removeLayer(accuracyCircle);
+    }
+    accuracyCircle = L.circle([lat, lng], {
         color: 'green',
         fillColor: '#00ff00',
         fillOpacity: 0.1,
         radius: accuracy
     }).addTo(map).bindPopup('Area Akurasi GPS (±' + Math.round(accuracy) + ' meter)');
     
-    // Calculate distance
+    // Calculate distance to school
     const distance = calculateDistance(lat, lng, OFFICE_LAT, OFFICE_LNG);
     document.getElementById('distance').textContent = Math.round(distance);
     
     // Update validation status
     updateLocationValidation(distance, accuracy);
     
-    // Update status
-    let statusClass = 'alert-success';
-    let statusIcon = 'fas fa-check-circle text-success';
-    let statusMessage = 'Lokasi berhasil diambil';
-    
-    if (accuracy > 100) {
-        statusClass = 'alert-warning';
-        statusIcon = 'fas fa-exclamation-triangle text-warning';
+    // Update status message
+    let statusClass, statusIcon, statusMessage;
+    if (accuracy <= MIN_ACCURACY) {
+        statusClass = 'success';
+        statusIcon = 'fa-check-circle';
+        statusMessage = 'Lokasi berhasil diambil';
+    } else {
+        statusClass = 'warning';
+        statusIcon = 'fa-exclamation-triangle';
         statusMessage = `Lokasi kurang akurat (±${Math.round(accuracy)} meter). Pastikan GPS aktif dan sinyal baik.`;
     }
     
-    document.getElementById('location-status').innerHTML = `<i class="${statusIcon}"></i> ${statusMessage}`;
-    document.getElementById('location-status').className = `alert ${statusClass}`;
+    updateLocationStatus(statusMessage, statusClass, statusIcon);
     
     // Enable attendance button
     document.getElementById('attendance').disabled = false;
@@ -245,6 +258,31 @@ function updateUserLocation(lat, lng, accuracy) {
     map.fitBounds(group.getBounds().pad(0.5));
 }
 
+// Handle location errors
+function handleLocationError(error) {
+    let errorMsg = '';
+    switch(error.code) {
+        case 1: errorMsg = "Izin lokasi ditolak. Izinkan akses lokasi untuk hasil akurat."; break;
+        case 2: errorMsg = "Informasi lokasi tidak tersedia. Coba di tempat terbuka."; break;
+        case 3: errorMsg = "Timeout mengambil lokasi. Pastikan GPS aktif."; break;
+        default: errorMsg = "Error: " + error.message; break;
+    }
+    
+    updateLocationStatus(errorMsg, 'warning', 'fa-exclamation-circle');
+    
+    // Update display for no location
+    document.getElementById('current-lat').textContent = 'Tidak tersedia';
+    document.getElementById('current-lng').textContent = 'Tidak tersedia';
+    document.getElementById('accuracy').textContent = 'Tidak tersedia';
+    document.getElementById('distance').textContent = 'Tidak tersedia';
+    document.getElementById('location-validation').textContent = 'Tidak tersedia';
+    document.getElementById('location-validation').className = 'badge badge-secondary';
+    
+    // Still allow attendance with special statuses
+    document.getElementById('attendance').disabled = false;
+}
+
+// Update location validation status
 function updateLocationValidation(distance, accuracy) {
     const validationElement = document.getElementById('location-validation');
     
@@ -257,40 +295,7 @@ function updateLocationValidation(distance, accuracy) {
     }
 }
 
-function handleLocationError(error) {
-    let errorMsg = '';
-    switch(error.code) {
-        case 1: // PERMISSION_DENIED
-            errorMsg = "Izin lokasi ditolak. Izinkan akses lokasi untuk hasil akurat.";
-            break;
-        case 2: // POSITION_UNAVAILABLE
-            errorMsg = "Informasi lokasi tidak tersedia. Coba di tempat terbuka.";
-            break;
-        case 3: // TIMEOUT
-            errorMsg = "Timeout mengambil lokasi. Pastikan GPS aktif.";
-            break;
-        default:
-            errorMsg = "Error: " + error.message;
-            break;
-    }
-    
-    document.getElementById('location-status').innerHTML = 
-        `<i class="fas fa-exclamation-circle text-warning"></i> ${errorMsg}`;
-    document.getElementById('location-status').className = 'alert alert-warning';
-    
-    // Update display for no location
-    document.getElementById('current-lat').textContent = 'Tidak tersedia';
-    document.getElementById('current-lng').textContent = 'Tidak tersedia';
-    document.getElementById('accuracy').textContent = 'Tidak tersedia';
-    document.getElementById('distance').textContent = 'Tidak tersedia';
-    document.getElementById('location-validation').textContent = 'Tidak tersedia';
-    document.getElementById('location-validation').className = 'badge badge-secondary';
-    
-    // Tetap bisa absen dengan catatan khusus
-    document.getElementById('attendance').disabled = false;
-}
-
-// Calculate distance between two points using Haversine formula
+// Calculate distance using Haversine formula
 function calculateDistance(lat1, lng1, lat2, lng2) {
     const R = 6371e3; // Earth's radius in meters
     const φ1 = lat1 * Math.PI/180;
@@ -306,23 +311,57 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
     return R * c; // Distance in meters
 }
 
+// Update location status message
+function updateLocationStatus(message, type = 'info', icon = 'fa-info-circle') {
+    const statusElement = document.getElementById('location-status');
+    statusElement.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
+    statusElement.className = `alert alert-${type}`;
+}
+
 // Handle attendance submission
-document.getElementById('attendance').addEventListener('click', function() {
+document.getElementById('attendance').addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    // Debounce click to prevent double submission
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        processAttendance();
+    }, DEBOUNCE_TIME);
+});
+
+// Process attendance submission
+function processAttendance() {
+    // Prevent multiple submissions
+    if (isSubmittingAttendance || hasAttendedToday || attendanceProcessed) {
+        return;
+    }
+
     const userId = document.getElementById('user_id').value;
     const description = document.getElementById('description').value;
     const latitude = document.getElementById('user_lat').value;
     const longitude = document.getElementById('user_lng').value;
     
+    // Validate description
     if (!description) {
-        alert('Silakan pilih keterangan absensi terlebih dahulu!');
+        showAlert('Silakan pilih keterangan absensi terlebih dahulu!', 'danger');
         return;
     }
     
-    // Validasi lokasi untuk status tertentu
+    // Set submission state
+    isSubmittingAttendance = true;
+    attendanceProcessed = true;
+    disableForm(true);
+    
+    // Generate unique request ID
+    const requestId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    document.getElementById('request_id').value = requestId;
+    
+    // Validate location for certain statuses
     const exemptDescriptions = ['WFH', 'Sakit', 'Izin'];
     if (!exemptDescriptions.includes(description)) {
         if (!latitude || !longitude) {
-            alert('Lokasi tidak terdeteksi. Pastikan GPS aktif dan izinkan akses lokasi.');
+            showAlert('Lokasi tidak terdeteksi. Pastikan GPS aktif dan izinkan akses lokasi.', 'danger');
+            resetFormState();
             return;
         }
         
@@ -337,25 +376,29 @@ document.getElementById('attendance').addEventListener('click', function() {
             const confirmMsg = `Anda berada ${Math.round(distance)} meter dari sekolah (maksimal ${MAX_DISTANCE} meter). ` +
                              `Apakah Anda yakin ingin melanjutkan absensi dengan status "${description}"?`;
             if (!confirm(confirmMsg)) {
+                resetFormState();
                 return;
             }
         }
     }
     
-    // Disable button and show loading
-    this.disabled = true;
-    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
-    
-    // Prepare data
+    // Prepare attendance data
     const attendanceData = {
         user_id: userId,
-        present_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
         description: description,
         latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null
+        longitude: longitude ? parseFloat(longitude) : null,
+        client_timestamp: Date.now(),
+        request_id: requestId
     };
     
-    // Send attendance data
+    // Store request ID in session storage
+    sessionStorage.setItem('current_attendance_request', requestId);
+    
+    // Send attendance data with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
     fetch('{{ route("attendance.store") }}', {
         method: 'POST',
         headers: {
@@ -363,58 +406,118 @@ document.getElementById('attendance').addEventListener('click', function() {
             'X-CSRF-TOKEN': '{{ csrf_token() }}',
             'X-Requested-With': 'XMLHttpRequest'
         },
-        credentials: 'same-origin',
+        signal: controller.signal,
         body: JSON.stringify(attendanceData)
     })
     .then(response => {
+        clearTimeout(timeoutId);
         if (!response.ok) {
             return response.json().then(err => Promise.reject(err));
         }
         return response.json();
     })
     .then(data => {
+        sessionStorage.removeItem('current_attendance_request');
+        
         if (data.success) {
-            document.getElementById('result').innerHTML = 
-                `<div class="alert alert-success">
-                    <i class="fas fa-check-circle"></i> ${data.message}
-                    <br><small>Waktu: ${data.data.time} | Tanggal: ${data.data.date}</small>
-                    ${data.data.distance ? `<br><small>Jarak dari sekolah: ${data.data.distance} meter</small>` : ''}
-                </div>`;
-            
-            // Reset form
-            document.getElementById('description').value = '';
-            this.innerHTML = '<i class="fas fa-check"></i> Absensi Berhasil';
-            
-            // Show success message and redirect
-            setTimeout(() => {
-                window.location.href = '{{ url("user/home") }}';
-            }, 3000);
+            handleAttendanceSuccess(data, userId);
         } else {
             throw new Error(data.message || 'Terjadi kesalahan');
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        clearTimeout(timeoutId);
+        sessionStorage.removeItem('current_attendance_request');
         
-        let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
-        if (error.message) {
-            errorMessage = error.message;
-        }
-        
-        document.getElementById('result').innerHTML = 
-            `<div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle"></i> ${errorMessage}
-            </div>`;
-        
-        this.disabled = false;
-        this.innerHTML = '<i class="fas fa-clock"></i> Absen Sekarang';
+        console.error('Attendance error:', error);
+        handleAttendanceError(error, userId);
     });
-});
+}
+
+// Handle successful attendance submission
+function handleAttendanceSuccess(data, userId) {
+    // Mark as attended permanently
+    hasAttendedToday = true;
+    localStorage.setItem('attended_today_' + userId, new Date().toDateString());
+    
+    // Show success message
+    document.getElementById('result').innerHTML = 
+        `<div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> ${data.message}
+            <br><small>Waktu: ${data.data.time} | Tanggal: ${data.data.date}</small>
+            ${data.data.distance ? `<br><small>Jarak dari sekolah: ${data.data.distance} meter</small>` : ''}
+        </div>`;
+    
+    // Update button state
+    const btn = document.getElementById('attendance');
+    btn.innerHTML = '<i class="fas fa-check"></i> Absensi Berhasil';
+    btn.className = btn.className.replace('btn-primary', 'btn-success');
+    
+    // Redirect after delay
+    setTimeout(() => {
+        window.location.href = '{{ url("user/home") }}';
+    }, 3000);
+}
+
+// Handle attendance errors
+function handleAttendanceError(error, userId) {
+    let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+    if (error.message) {
+        errorMessage = error.message;
+    }
+    
+    // Handle specific error types
+    if (error.name === 'AbortError') {
+        errorMessage = 'Request timeout. Silakan coba lagi.';
+    }
+    
+    // Check if error indicates already attended
+    if (error.message && error.message.includes('sudah melakukan absensi')) {
+        hasAttendedToday = true;
+        localStorage.setItem('attended_today_' + userId, new Date().toDateString());
+        
+        const btn = document.getElementById('attendance');
+        btn.innerHTML = '<i class="fas fa-check"></i> Sudah Absen Hari Ini';
+        btn.className = btn.className.replace('btn-primary', 'btn-secondary');
+        return;
+    }
+    
+    showAlert(errorMessage, 'danger');
+    resetFormState();
+}
+
+// Show alert message
+function showAlert(message, type = 'info') {
+    document.getElementById('result').innerHTML = 
+        `<div class="alert alert-${type}">
+            <i class="fas ${type === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${message}
+        </div>`;
+}
+
+// Reset form state after error
+function resetFormState() {
+    isSubmittingAttendance = false;
+    attendanceProcessed = false;
+    disableForm(false);
+}
+
+// Enable/disable form elements
+function disableForm(disabled) {
+    const btn = document.getElementById('attendance');
+    btn.disabled = disabled;
+    btn.innerHTML = disabled 
+        ? '<i class="fas fa-spinner fa-spin"></i> Memproses...' 
+        : '<i class="fas fa-clock"></i> Absen Sekarang';
+    
+    document.getElementById('description').disabled = disabled;
+}
 
 // Check if user already attended today
 function checkTodayAttendance() {
     const userId = document.getElementById('user_id').value;
+    const today = new Date().toDateString();
     
+    // Check with server first, ignore localStorage
     fetch('{{ route("attendance.check-status") }}', {
         method: 'POST',
         headers: {
@@ -422,65 +525,113 @@ function checkTodayAttendance() {
             'X-CSRF-TOKEN': '{{ csrf_token() }}',
             'X-Requested-With': 'XMLHttpRequest'
         },
-        credentials: 'same-origin',
         body: JSON.stringify({ user_id: userId })
     })
     .then(response => response.json())
     .then(data => {
         if (!data.can_attend && data.attendance) {
-            document.getElementById('result').innerHTML = 
-                `<div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> 
-                    Anda sudah melakukan absensi hari ini pada pukul ${data.attendance.time} 
-                    dengan status: <strong>${data.attendance.description}</strong>
-                </div>`;
-            
-            document.getElementById('attendance').disabled = true;
-            document.getElementById('attendance').innerHTML = 
-                '<i class="fas fa-check"></i> Sudah Absen Hari Ini';
-            document.getElementById('description').disabled = true;
+            localStorage.setItem('attended_today_' + userId, today);
+            markAsAttended(data.attendance);
+        } else {
+            // Clear localStorage jika tidak ada absensi
+            localStorage.removeItem('attended_today_' + userId);
+            resetFormState();
         }
     })
     .catch(error => {
         console.error('Error checking attendance status:', error);
+        // Fallback ke localStorage jika server error
+        const storedAttendance = localStorage.getItem('attended_today_' + userId);
+        if (storedAttendance === today) {
+            markAsAttended();
+        }
     });
 }
 
-// Auto refresh location every 30 seconds for better accuracy
+// Mark user as already attended
+function markAsAttended(attendanceData = null) {
+    hasAttendedToday = true;
+    attendanceProcessed = true;
+    
+    if (attendanceData) {
+        document.getElementById('result').innerHTML = 
+            `<div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                Anda sudah melakukan absensi hari ini pada pukul ${attendanceData.time} 
+                dengan status: <strong>${attendanceData.description}</strong>
+            </div>`;
+    }
+    
+    const btn = document.getElementById('attendance');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-check"></i> Sudah Absen Hari Ini';
+    btn.className = btn.className.replace('btn-primary', 'btn-secondary');
+    document.getElementById('description').disabled = true;
+}
+
+// Auto refresh location periodically
 function startLocationRefresh() {
     setInterval(() => {
         if (navigator.geolocation && userLat && userLng) {
             navigator.geolocation.getCurrentPosition(
-                function(position) {
+                position => {
                     const newLat = position.coords.latitude;
                     const newLng = position.coords.longitude;
                     const newAccuracy = position.coords.accuracy;
                     
-                    // Only update if there's significant change or better accuracy
+                    // Only update if significant change or better accuracy
                     if (Math.abs(newLat - userLat) > 0.0001 || 
                         Math.abs(newLng - userLng) > 0.0001 || 
                         newAccuracy < userAccuracy) {
                         updateUserLocation(newLat, newLng, newAccuracy);
                     }
                 },
-                function(error) {
-                    console.log('Location refresh failed:', error.message);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 30000
-                }
+                error => console.log('Location refresh failed:', error.message),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
             );
         }
-    }, 30000); // Refresh every 30 seconds
+    }, LOCATION_REFRESH_INTERVAL);
+}
+
+function resetAttendanceState() {
+    const userId = document.getElementById('user_id').value;
+    localStorage.removeItem('attended_today_' + userId);
+    hasAttendedToday = false;
+    attendanceProcessed = false;
+    disableForm(false);
+    
+    const btn = document.getElementById('attendance');
+    btn.innerHTML = '<i class="fas fa-clock"></i> Absen Sekarang';
+    btn.className = btn.className.replace('btn-secondary', 'btn-primary');
+    document.getElementById('description').disabled = false;
+    
+    document.getElementById('result').innerHTML = '';
+}
+
+// Start periodic attendance status check
+function startAttendanceStatusCheck() {
+    setInterval(() => {
+        if (!hasAttendedToday && !isSubmittingAttendance) {
+            checkTodayAttendance();
+        }
+    }, ATTENDANCE_CHECK_INTERVAL);
+}
+
+// Clear old attendance data from localStorage
+function clearOldAttendanceData() {
+    const today = new Date().toDateString();
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('attended_today_') && localStorage.getItem(key) !== today) {
+            localStorage.removeItem(key);
+        }
+    });
 }
 
 // Handle description change for location requirement info
 document.getElementById('description').addEventListener('change', function() {
     const selectedValue = this.value;
     const exemptDescriptions = ['WFH', 'Sakit', 'Izin'];
-    const infoElement = document.querySelector('.form-text');
+    const infoElement = document.getElementById('description-info');
     
     if (exemptDescriptions.includes(selectedValue)) {
         infoElement.innerHTML = 
@@ -502,10 +653,16 @@ document.getElementById('description').addEventListener('change', function() {
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    clearOldAttendanceData();
     initMap();
     getUserLocation();
     checkTodayAttendance();
     startLocationRefresh();
+    startAttendanceStatusCheck();
+    
+    // Generate initial request ID
+    document.getElementById('request_id').value = 
+        'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 });
 
 // Custom CSS for map icons
@@ -544,11 +701,7 @@ style.textContent = `
         font-size: 0.8em;
     }
     
-    #accuracy {
-        font-weight: bold;
-    }
-    
-    #distance {
+    #accuracy, #distance {
         font-weight: bold;
     }
     
