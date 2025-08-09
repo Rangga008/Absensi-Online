@@ -83,6 +83,10 @@ Route::prefix('admin')->group(function () {
         'update' => 'admin.salaries.update',
         'destroy' => 'admin.salaries.destroy'
     ]);
+
+    // Route untuk attendance per user
+Route::get('/admin/users/{user}/attendances', [UserAttendanceController::class, 'userAttendances'])
+     ->name('admin.users.attendances');
     
     Route::resource('attendances', AttendanceController::class)->names([
         'index' => 'admin.attendances.index',
@@ -93,6 +97,7 @@ Route::prefix('admin')->group(function () {
         'update' => 'admin.attendances.update',
         'destroy' => 'admin.attendances.destroy'
     ]);
+    
     
     Route::resource('concessions', ConcessionController::class)->names([
         'index' => 'admin.concessions.index',

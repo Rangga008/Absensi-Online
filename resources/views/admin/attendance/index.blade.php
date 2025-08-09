@@ -1,124 +1,86 @@
 @extends('layouts.admin')
 
+@section('styles')
+<style>
+.filter-section {
+    width: 200px;
+}
+#roleFilter {
+    cursor: pointer;
+}
+</style>
+@endsection
+
 @section('content')
+<h1 class="h3 mb-2 text-gray-800">Users Attendance</h1>
 
-<!-- Page Heading -->
-@if(session('role_id') == 1)
-<h1 class="h3 mb-2 text-gray-800">Management attendance</h1>
-<p class="mb-4">Disini fitur untuk menyunting dan menghapus data absen pengguna.</p>
-@else 
-<h1 class="h3 mb-2 text-gray-800">List Attendance</h1>
-@endif
-
-<!-- DataTales Example -->
 <div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Attendance Summary</h6>
+        <div class="filter-section">
+            <select id="roleFilter" class="form-control form-control-sm">
+            <option value="all">All Roles</option>
+            @foreach($roles as $role)
+                <option value="{{ $role->id }}" {{ request('role_id') == $role->id ? 'selected' : '' }}>
+                    {{ $role->role_name }} <!-- Perhatikan ini menggunakan role_name bukan name -->
+                </option>
+            @endforeach
+            </select>
+        </div>
+    </div>
     <div class="card-body">
-        @if(session()->has('message'))
-        <div class="alert alert-success">
-            {!! session('message') !!}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        @endif
-        
-        @if(session()->has('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        @endif
-        
-        @if(session()->has('error'))
-        <div class="alert alert-danger">
-            {{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        @endif
-        
-        @if(session('role_id') == 1)
-        <div class="text-right">
-            <a href="{{ route('admin.attendances.create') }}" class="btn btn-success m-2">
-                <i class="fas fa-plus mr-1"></i> New attendance
-            </a>
-        </div>
-        @endif
-        
         <div class="table-responsive">
-            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                <thead class="bg-light">
+            <table class="table table-bordered" id="attendanceTable">
+                <thead>
                     <tr>
                         <th>No</th>
                         <th>Name</th>
-                        <th>Present at</th>
-                        <th>Description</th>
-                        @if(session('role_id') !== 3)
-                        <th>Action</th>
-                        @endif
+                        <th>Total Attendance</th>
+                        <th>Last Attendance</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($attendances as $attendance)
-                    <tr>
-                        <td>{{ $loop->iteration }}</td>
-                        <td>{{ $attendance->user->name ?? 'N/A' }}</td>
-                        <td>{{ date('D, d F Y H:i', strtotime($attendance->present_at)) }}</td>
-                        <td>
-                            <span class="badge 
-                                @if($attendance->description == 'Hadir') badge-success
-                                @elseif($attendance->description == 'Terlambat') badge-warning
-                                @elseif($attendance->description == 'Sakit') badge-info
-                                @elseif($attendance->description == 'Izin') badge-secondary
-                                @elseif($attendance->description == 'Dinas Luar') badge-primary
-                                @elseif($attendance->description == 'WFH') badge-dark
-                                @else badge-light
-                                @endif">
-                                {{ $attendance->description }}  
-                            </span>
-                        </td>
-                        @if(session('role_id') !== 3)
-                        <td>
-                            <a href="{{ route('admin.attendances.show', $attendance->id) }}" 
-                               class="btn btn-info btn-sm" title="View">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            @if(session('role_id') == 1)
-                            <a href="{{ route('admin.attendances.edit', $attendance->id) }}" 
-                               class="btn btn-primary btn-sm" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <form action="{{ route('admin.attendances.destroy', $attendance->id) }}" 
-                                  method="POST" class="d-inline">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" 
-                                        onclick="return confirm('Apakah anda yakin akan dihapus?')" 
-                                        class="btn btn-danger btn-sm" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </form>
-                            @endif
-                        </td>
-                        @endif
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="{{ session('role_id') !== 3 ? '5' : '4' }}" class="text-center">
-                            <em>No attendance records found</em>
-                        </td>
-                    </tr>
-                    @endforelse
+                    @include('admin.attendance.partials.user_rows')
                 </tbody>
             </table>
-            <div class="d-flex justify-content-center">
-                {{ $attendances->links() }}
+            <div id="pagination-links">
+                {{ $users->links() }}
             </div>
         </div>
     </div>
 </div>
+@endsection
 
+@section('scripts')
+<script>
+$(document).ready(function() {
+    // Filter realtime berdasarkan role
+    $('#roleFilter').change(function() {
+    const roleId = $(this).val();
+    const url = new URL(window.location.href);
+    
+    if (roleId === 'all') {
+        url.searchParams.delete('role_id');
+    } else {
+        url.searchParams.set('role_id', roleId);
+    }
+    
+    window.location.href = url.toString();
+    });
+
+    // Auto refresh setiap 30 detik
+    setInterval(function() {
+        const roleId = $('#roleFilter').val();
+        
+        $.ajax({
+            url: "{{ route('admin.attendances.index') }}",
+            data: { role_id: roleId },
+            success: function(data) {
+                $('#attendanceTable tbody').html($(data).find('#attendanceTable tbody').html());
+            }
+        });
+    }, 30000);
+});
+</script>
 @endsection

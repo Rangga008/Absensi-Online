@@ -3,14 +3,15 @@
 @section('content')
 
 <!-- Page Heading -->
-<a href="{{ route('admin.users.index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
-
+<a href="{{ route('admin.users.index') }}" class="btn btn-primary">
+    <i class="fas fa-arrow-left"></i> Back
+</a>
 <h1 class="h3 m-4 text-gray-800">Edit users</h1>
 
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
     <div class="card-body">
-        <form action="{{ url('user') }}/{{ $user->id }}" method="POST">
+        <form action="{{ route('admin.users.update', $user->id) }}" method="POST">
             @method('PUT')
             @csrf
             <div class="form-group row">

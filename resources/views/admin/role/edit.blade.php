@@ -1,31 +1,45 @@
 @extends('layouts.admin')
 
 @section('content')
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{{ route('admin.roles.index') }}" class="btn btn-primary">
+        <i class="fas fa-arrow-left"></i> Back to Roles
+    </a>
+    <h1 class="h3 mb-0 text-gray-800">Edit Role: {{ $role->role_name }}</h1>
+</div>
 
-<!-- Page Heading -->
-<a href="{{ url('role') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
-<h1 class="h3 m-3 text-gray-800">Edit role</h1>
-
-<!-- DataTales Example -->
-<div class="card shadow mb-4">
+<div class="card shadow">
     <div class="card-body">
-        <form action="{{ url('role') }}/{{ $role->id }}" method="POST">
-            @method('PUT')
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form action="{{ route('admin.roles.update', $role->id) }}" method="POST">
             @csrf
-            <div class="form-group row justify-content-center">
-                <div class="col-md-5 text-center">
-                    <label for="">Name</label>
-                    <input type="text" placeholder="New role .." value="{{ $role->role_name }}" class="form-control" name="role_name" value="{{ old('role_name') }}">
-                    @error('role_name')
-                    <small class="text-danger">{{ $message }}</small>
-                    @enderror
-                </div>
-                <div class="col-md-12 text-center">
-                    <button type="submit" class="btn btn-success mt-2">Submit</button>
-                </div>
+            @method('PUT')
+            
+            <div class="form-group">
+                <label for="role_name">Role Name</label>
+                <input type="text" class="form-control @error('role_name') is-invalid @enderror" 
+                       id="role_name" name="role_name" 
+                       value="{{ old('role_name', $role->role_name) }}" required>
+                @error('role_name')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            
+            <div class="form-group text-right">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Update Role
+                </button>
             </div>
         </form>
     </div>
 </div>
-
 @endsection

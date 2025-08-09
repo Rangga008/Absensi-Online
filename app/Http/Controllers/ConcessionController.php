@@ -10,128 +10,121 @@ class ConcessionController extends Controller
 {
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
     public function index()
     {
-        if (!session()->has('admin_id')) {
-        return redirect('/admin/login')->with('error', 'Please login first');
-    }
-        $concessions = Concession::orderBy('created_at', 'desc')->paginate(10);
+        if (!session('is_admin') && session('role_id') != 3) {
+            return redirect()->route('admin.login');
+        }
+
+        if (session('role_id') == 3) { // If user is karyawan
+            $concessions = Concession::where('user_id', session('user_id'))
+                            ->orderBy('created_at', 'desc')
+                            ->paginate(10);
+        } else {
+            $concessions = Concession::with('user')
+                            ->orderBy('created_at', 'desc')
+                            ->paginate(10);
+        }
+        
         return view('admin.concession.index', compact('concessions'));
     }
 
     /**
      * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
      */
     public function create()
     {
-        if (session('role_id') == 3) {
-            abort(404);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
-        $users = User::all();
+
+        $users = User::where('role_id', 4)->get(); // Only show karyawan users
         return view('admin.concession.create', compact('users'));
     }
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
     {
-        if (session('role_id') == 3) {
-            abort(404);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
-        $request->validate([
-            'description' => 'required',
-        ]);
 
-        $user = User::find($request->user_id);
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'reason' => 'required|in:sakit,izin,cuti',
+            'description' => 'required|string|max:500',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date'
+        ]);
 
         Concession::create([
             'user_id' => $request->user_id,
             'reason' => $request->reason,
             'description' => $request->description,
-            'created_at' => date('Y-m-d H:i:s'),
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'status' => 'pending'
         ]);
 
-        return redirect('concession')->with('message', 'New concession for <b>' . $user->name . '</b> has been created!');
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        //
+        return redirect()->route('admin.concessions.index')
+               ->with('success', 'Concession created successfully!');
     }
 
     /**
      * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function edit($id)
     {
-        if (session('role_id') == 3) {
-            abort(404);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
-        $users = User::all();
-        $concession = Concession::find($id);
+
+        $concession = Concession::findOrFail($id);
+        $users = User::where('role_id', 4)->get(); // Only show karyawan users
         return view('admin.concession.edit', compact('concession', 'users'));
     }
 
     /**
      * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id)
     {
-        if (session('role_id') == 3) {
-            abort(404);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
+
         $request->validate([
-            'description' => 'required',
+            'user_id' => 'required|exists:users,id',
+            'reason' => 'required|in:sakit,izin,cuti',
+            'description' => 'required|string|max:500',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'status' => 'required|in:pending,approved,rejected'
         ]);
 
-        $user = User::find($request->user_id);
+        $concession = Concession::findOrFail($id);
+        $concession->update($request->all());
 
-        Concession::where('id', $id)->update([
-            'user_id' => $request->user_id,
-            'reason' => $request->reason,
-            'description' => $request->description,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        return redirect('concession')->with('message', 'Concession from <b>' . $user->name . '</b> has been updated!');
+        return redirect()->route('admin.concessions.index')
+               ->with('success', 'Concession updated successfully!');
     }
 
     /**
      * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
      */
     public function destroy($id)
     {
-        if (session('role_id') == 3) {
-            abort(404);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
-        $concession = Concession::find($id);
-        $user = User::find($concession->user->id);
-        Concession::where('id', $id)->delete();
-        return redirect('concession')->with('message', 'Concession from <strong>' . $user->name . '</strong> has been deleted!');
+
+        $concession = Concession::findOrFail($id);
+        $concession->delete();
+
+        return redirect()->route('admin.concessions.index')
+               ->with('success', 'Concession deleted successfully!');
     }
 }

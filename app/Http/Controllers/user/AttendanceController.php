@@ -404,4 +404,23 @@ class AttendanceController extends Controller
     // Anda juga bisa menambahkan log atau notifikasi ke user di sini
 }
 
+public function userAttendances($userId)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+    
+    try {
+        $user = User::findOrFail($userId);
+        $attendances = Attendance::where('user_id', $userId)
+            ->orderBy('present_at', 'desc')
+            ->paginate(10);
+
+        return view('admin.attendance.user_attendances', compact('user', 'attendances'));
+    } catch (\Exception $e) {
+        Log::error('Error loading user attendances', ['error' => $e->getMessage()]);
+        return back()->with('error', 'Error loading attendances: ' . $e->getMessage());
+    }
+}
+
 }

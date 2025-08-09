@@ -29,10 +29,10 @@ class UserController extends Controller
             ->paginate(10);
             
         if ($request->ajax()) {
-            return response()->json([
-                'users' => $users->items(),
-                'pagination' => $users->links()->toHtml()
-            ]);
+        return response()->json([
+            'users' => $users->items(),
+            'pagination' => $users->links()->toHtml()
+        ]);
         }
         
         return view('admin.user.index', compact('users'));

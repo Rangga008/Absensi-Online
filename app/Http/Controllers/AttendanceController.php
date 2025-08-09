@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\Cache; // Tambahkan ini
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,23 +17,39 @@ class AttendanceController extends Controller
     /**
      * Display attendance records (admin view)
      */
-    public function index()
-    {
-        if (!session('is_admin') || !session('admin_id')) {
-            return redirect()->route('admin.login')->with('message', 'Please login as admin');
-        }
-        
-        try {
-            $attendances = Attendance::with('user')
-                ->orderBy('present_at', 'desc')
-                ->paginate(10);
-
-            return view('admin.attendance.index', compact('attendances'));
-        } catch (\Exception $e) {
-            Log::error('Error loading attendances', ['error' => $e->getMessage()]);
-            return back()->with('error', 'Error loading attendances: ' . $e->getMessage());
-        }
+   public function index(Request $request)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
     }
+    
+    try {
+        // Get roles excluding admin (id=1)
+        $roles = Role::whereNotIn('id', [1]) // Exclude Super Admin
+               ->whereNull('deleted_at')
+               ->get();
+        
+        // Debug: tampilkan data roles
+        // dd($roles);
+        
+        $query = User::withCount('attendances')
+            ->with(['attendances' => function($query) {
+                $query->orderBy('present_at', 'desc')->limit(1);
+            }])
+            ->where('role_id', '!=', 1); // Exclude admin
+
+        if ($request->has('role_id') && $request->role_id != 'all') {
+            $query->where('role_id', $request->role_id);
+        }
+
+        $users = $query->paginate(10);
+
+        return view('admin.attendance.index', compact('users', 'roles'));
+    } catch (\Exception $e) {
+        Log::error('Error loading users attendance', ['error' => $e->getMessage()]);
+        return back()->with('error', 'Error loading data: ' . $e->getMessage());
+    }
+}
 
     /**
      * Show attendance creation form (admin)
@@ -212,5 +229,8 @@ private function clearUserAttendanceCache($userId)
     
     // Anda juga bisa menambahkan log atau notifikasi ke user di sini
 }
+
+// Tambahkan method baru untuk menampilkan attendance per user
+
 
 }

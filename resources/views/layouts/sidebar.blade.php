@@ -3,7 +3,7 @@
 
     <!-- Sidebar - Brand -->
     <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('admin.dashboard') }}">
-        <div class="sidebar-brand-text mx-3">Presensi Online <small> PT. Codepolitan </small></div><br>
+        <div class="sidebar-brand-text mx-3">Presensi Online <small> SMKN 2 Bandung </small></div><br>
     </a>
 
     <!-- Divider -->

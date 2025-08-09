@@ -41,16 +41,13 @@ class RoleController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'role_name' => 'required',
+        $validated = $request->validate([
+            'role_name' => 'required|unique:roles,role_name|max:255',
         ]);
 
-        Role::create([
-            'role_name' => $request->role_name,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        Role::create($validated);
 
-        return redirect('/role')->with('message', 'Role baru berhasil ditambahkan!');
+        return redirect()->route('admin.roles.index')->with('success', 'Role berhasil ditambahkan!');
     }
 
     /**
@@ -86,13 +83,13 @@ class RoleController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'role_name' => 'required',
+            'role_name' => 'required|unique:roles,role_name,'.$id.'|max:255',
         ]);
 
-        Role::where('id', $id)->update([
-            'role_name' => $request->role_name,
-        ]);
-        return redirect('role')->with('message', 'Role berhasil diupdate!');
+        $role = Role::findOrFail($id);
+        $role->update($request->only('role_name'));
+
+        return redirect()->route('admin.roles.index')->with('success', 'Role updated successfully!');
     }
 
     /**
@@ -103,7 +100,14 @@ class RoleController extends Controller
      */
     public function destroy($id)
     {
-        Role::where('id', $id)->delete();
-        return redirect('role')->with('message', 'Role berhasil dihapus!');
+        $role = Role::findOrFail($id);
+        
+        // Cek apakah role sedang digunakan
+        if ($role->users()->exists()) {
+            return back()->with('error', 'Cannot delete role because it has users assigned');
+        }
+
+        $role->delete();
+        return redirect()->route('admin.roles.index')->with('success', 'Role deleted successfully!');
     }
 }

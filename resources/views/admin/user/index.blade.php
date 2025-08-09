@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
             
             // Kirim request ke server
-            const response = await fetch(`{{ route("admin.users.index") }}?sort=${currentSort.column}&direction=${currentSort.direction}`);
+            const response = await fetch(`{{ route("admin.users.index") }}?sort=${currentSort.column}&direction=${currentSort.direction}&ajax=1`);
             const data = await response.json();
             
             // Update tabel dengan data baru

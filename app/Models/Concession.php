@@ -11,6 +11,7 @@ class Concession extends Model
     use HasFactory;
     protected $guarded = [];
     protected $table = 'concession';
+    protected $dates = ['start_date', 'end_date', 'created_at', 'updated_at'];
 
     public function user()
     {

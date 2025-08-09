@@ -3,13 +3,15 @@
 @section('content')
 
 <!-- Page Heading -->
-<a href="{{ url('user') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
+<a href="{{ route('admin.users.index') }}" class="btn btn-primary">
+    <i class="fas fa-arrow-left"></i> Back
+</a>
 <h1 class="h3 my-4 text-gray-800">Add users</h1>
 
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
     <div class="card-body">
-        <form action="{{ url('user') }}" method="POST">
+        <form action="{{ route('admin.users.store') }}" method="POST">
             @csrf
             <div class="form-group row">
                 <div class="col-md-6">
@@ -42,12 +44,11 @@
                 </div>
                 <div class="col-md-6 mt-2">
                     <label for="">Role</label>
-                    <select name="role_id" class="form-control">
-                        <option value="1">Super admin</option>
-                        <option value="2">Staff HRD</option>
-                        <option value="3">Pimpinan</option>
-                        <option value="4">Karyawan</option>
-                    </select>
+                    <select name="role_id" id="" class="form-control">
+                    @foreach($roles as $role)
+                        <option value="{{ $role->id }}">{{ $role->role_name }}</option>
+                    @endforeach
+                </select>
                 </div>
                 <div class="col-md-6 mt-2">
                     <label for="">Address</label>
