@@ -1,14 +1,16 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
-
 use App\Http\Controllers\user\AuthController as UserAuthController;
 use App\Http\Controllers\user\HomeController;
 use App\Http\Controllers\AuthController as AdminAuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\user\AttendanceController as UserAttendanceController;
-
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SalaryController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\ConcessionController;
 
 /** Route untuk halaman welcome/landing page */
 Route::get('/', function () {
@@ -16,7 +18,6 @@ Route::get('/', function () {
 });
 
 /** Authentication Routes (Non-prefixed) */
-// Main login form (for users)
 Route::get('/login', [UserAuthController::class, 'index'])->name('login');
 Route::post('/login', [UserAuthController::class, 'doLogin'])->name('login.process');
 Route::post('/logout', [UserAuthController::class, 'logout'])->name('user.logout');
@@ -30,30 +31,29 @@ Route::prefix('user')->middleware(['check.user.session'])->group(function () {
     Route::post('/store-concession', [HomeController::class, 'store_concession'])->name('user.store_concession');
     Route::get('/salary', [HomeController::class, 'show_salary'])->name('user.salary');
     Route::get('/history', [HomeController::class, 'show_history'])->name('user.history');
-    Route::get('/attendance', [HomeController::class, 'attendance'])->name('user.attendance');
-    Route::post('/do-attendance', [HomeController::class, 'do_attendance'])->name('user.do_attendance');
-    Route::post('/logout', [UserAuthController::class, 'logout'])->name('user.logout');
     Route::get('/attendance', [UserAttendanceController::class, 'index'])->name('user.attendance');
     Route::post('/do-attendance', [UserAttendanceController::class, 'store'])->name('user.do_attendance');
-    
 });
 
-/** Route untuk backend admin - SIMPLIFIED FOR DEBUGGING */
+/** Route untuk backend admin */
 Route::prefix('admin')->group(function () {
-    // Public admin routes (no middleware)
+    // Authentication
     Route::get('/login', [AdminAuthController::class, 'index'])->name('admin.login');
     Route::post('/login', [AdminAuthController::class, 'doLogin'])->name('admin.login.process');
     Route::get('/register', [AdminAuthController::class, 'register'])->name('admin.register');
     Route::post('/register', [AdminAuthController::class, 'doRegister'])->name('admin.register.process');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
     
-    // TEMPORARY: Remove middleware for debugging
-    // ADD BACK AFTER FIXING THE ISSUE
+    // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-    
-    // Protected admin routes - TEMPORARY WITHOUT MIDDLEWARE FOR DEBUGGING
-    // ADD MIDDLEWARE BACK AFTER TESTING
+
+    // Password Reset
+    Route::get('users/{user}/reset-password', [UserController::class, 'showResetPasswordForm'])
+        ->name('admin.users.reset-password.form');
+    Route::post('users/{user}/reset-password', [UserController::class, 'processResetPassword'])
+        ->name('admin.users.reset-password');
         
+    // Resources
     Route::resource('users', UserController::class)->names([
         'index' => 'admin.users.index',
         'create' => 'admin.users.create',
@@ -84,10 +84,7 @@ Route::prefix('admin')->group(function () {
         'destroy' => 'admin.salaries.destroy'
     ]);
 
-    // Route untuk attendance per user
-Route::get('/admin/users/{user}/attendances', [UserAttendanceController::class, 'userAttendances'])
-     ->name('admin.users.attendances');
-    
+    // Attendance Routes
     Route::resource('attendances', AttendanceController::class)->names([
         'index' => 'admin.attendances.index',
         'create' => 'admin.attendances.create',
@@ -98,7 +95,11 @@ Route::get('/admin/users/{user}/attendances', [UserAttendanceController::class, 
         'destroy' => 'admin.attendances.destroy'
     ]);
     
+    // User-specific attendances
+    Route::get('users/{user}/attendances', [AttendanceController::class, 'userAttendances'])
+        ->name('admin.users.attendances');
     
+    // Concessions
     Route::resource('concessions', ConcessionController::class)->names([
         'index' => 'admin.concessions.index',
         'create' => 'admin.concessions.create',
@@ -110,16 +111,6 @@ Route::get('/admin/users/{user}/attendances', [UserAttendanceController::class, 
     ]);
 });
 
-// Debug route untuk testing session
-Route::get('/debug-session', function () {
-    return [
-        'session_id' => session()->getId(),
-        'all_session' => session()->all(),
-        'is_admin' => session('is_admin'),
-        'admin_id' => session('admin_id'),
-    ];
-});
-
 /** Route untuk AJAX requests */
 Route::prefix('api')->group(function () {
     Route::post('/attendance/check-status', [UserAttendanceController::class, 'checkAttendanceStatus'])
@@ -128,4 +119,14 @@ Route::prefix('api')->group(function () {
         ->name('attendance.stats');
     Route::post('/attendance', [UserAttendanceController::class, 'store'])
         ->name('attendance.store');
+});
+
+// Debug route
+Route::get('/debug-session', function () {
+    return [
+        'session_id' => session()->getId(),
+        'all_session' => session()->all(),
+        'is_admin' => session('is_admin'),
+        'admin_id' => session('admin_id'),
+    ];
 });

@@ -19,6 +19,15 @@
     <!-- Custom styles for this template-->
     <link href="{{ asset('sbadmin') }}/css/sb-admin-2.min.css" rel="stylesheet">
 
+    <!-- Other meta tags -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+
 </head>
 
 <body id="page-top">
@@ -175,6 +184,8 @@
     <!-- Page level custom scripts -->
     <script src="{{ asset('sbadmin') }}/js/demo/chart-area-demo.js"></script>
     <script src="{{ asset('sbadmin') }}/js/demo/chart-pie-demo.js"></script>
+
+    
 
 </body>
 

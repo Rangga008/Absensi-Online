@@ -24,22 +24,50 @@ class AttendanceController extends Controller
     }
     
     try {
-        // Get roles excluding admin (id=1)
-        $roles = Role::whereNotIn('id', [1]) // Exclude Super Admin
-               ->whereNull('deleted_at')
-               ->get();
-        
-        // Debug: tampilkan data roles
-        // dd($roles);
+        // Get all roles
+        $roles = Role::whereNull('deleted_at')->get();
         
         $query = User::withCount('attendances')
-            ->with(['attendances' => function($query) {
-                $query->orderBy('present_at', 'desc')->limit(1);
-            }])
-            ->where('role_id', '!=', 1); // Exclude admin
-
-        if ($request->has('role_id') && $request->role_id != 'all') {
-            $query->where('role_id', $request->role_id);
+            ->with(['latestAttendance'])
+            ->with('role')
+            ->when($request->has('role_id') && $request->role_id != 'all', function($q) use ($request) {
+                $q->where('role_id', $request->role_id);
+            })
+            ->when($request->has('status') && $request->status != 'all', function($q) use ($request) {
+                $q->whereHas('latestAttendance', function($query) use ($request) {
+                    if ($request->status == 'present') {
+                        $query->where('description', 'Hadir');
+                    } elseif ($request->status == 'late') {
+                        $query->where('description', 'Terlambat');
+                    } elseif ($request->status == 'absent') {
+                        $query->whereIn('description', ['Sakit', 'Izin']);
+                    }
+                });
+            });
+            
+        // Handle sorting
+        if ($request->has('sort')) {
+            $sortColumn = $request->get('sort');
+            $sortDirection = $request->get('direction', 'asc');
+            
+            if ($sortColumn === 'role') {
+                $query->join('roles', 'users.role_id', '=', 'roles.id')
+                      ->orderBy('roles.role_name', $sortDirection)
+                      ->select('users.*');
+            } 
+            elseif ($sortColumn === 'last_attendance') {
+                $query->leftJoin('attendances', function($join) {
+                    $join->on('users.id', '=', 'attendances.user_id')
+                         ->whereRaw('attendances.present_at = (SELECT MAX(present_at) FROM attendances WHERE attendances.user_id = users.id)');
+                })
+                ->orderBy('attendances.present_at', $sortDirection);
+            }
+            else {
+                $query->orderBy($sortColumn, $sortDirection);
+            }
+        } else {
+            // Default sorting
+            $query->orderBy('name', 'asc');
         }
 
         $users = $query->paginate(10);
@@ -49,6 +77,52 @@ class AttendanceController extends Controller
         Log::error('Error loading users attendance', ['error' => $e->getMessage()]);
         return back()->with('error', 'Error loading data: ' . $e->getMessage());
     }
+}
+
+// Add this method to your AttendanceController
+public function userAttendances(User $user)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+
+    try {
+        $attendances = $user->attendances()
+            ->orderBy('present_at', 'desc')
+            ->paginate(10); // Changed from get() to paginate(10)
+            
+        // Calculate distance for each attendance
+        $attendances->getCollection()->transform(function($attendance) {
+            if ($attendance->latitude && $attendance->longitude) {
+                $attendance->distance = $this->calculateDistance(
+                    $attendance->latitude,
+                    $attendance->longitude,
+                    -6.906000, // SMKN 2 Bandung latitude
+                    107.623400 // SMKN 2 Bandung longitude
+                );
+            }
+            return $attendance;
+        });
+
+        return view('admin.attendance.user', compact('user', 'attendances'));
+    } catch (\Exception $e) {
+        Log::error('Error loading user attendances', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id
+        ]);
+        return back()->with('error', 'Error loading attendance records');
+    }
+}
+
+private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+{
+    $theta = $lon1 - $lon2;
+    $dist = sin(deg2rad($lat1)) * sin(deg2rad($lat2)) + 
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($theta));
+    $dist = acos($dist);
+    $dist = rad2deg($dist);
+    $miles = $dist * 60 * 1.1515;
+    return round($miles * 1609.344); // Convert to meters
 }
 
     /**

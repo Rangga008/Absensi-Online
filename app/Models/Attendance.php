@@ -191,4 +191,9 @@ class Attendance extends Model
     {
         return self::forUser($userId)->today()->first();
     }
+
+    public function latestAttendance()
+    {
+        return $this->hasOne(Attendance::class)->latestOfMany('present_at');
+    }
 }

@@ -40,6 +40,12 @@ public function getLastAttendanceAttribute()
     return $this->attendances()->orderBy('present_at', 'desc')->first();
 }
 
+// In User.php model
+public function latestAttendance()
+{
+    return $this->hasOne(Attendance::class)->latestOfMany('present_at');
+}
+
 public function getStatusBadgeAttribute()
 {
     $status = $this->description ?? '';

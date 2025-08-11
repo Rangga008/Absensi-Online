@@ -2,16 +2,31 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\User;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Concession extends Model
 {
-    use HasFactory;
-    protected $guarded = [];
+    use SoftDeletes;
+
     protected $table = 'concession';
-    protected $dates = ['start_date', 'end_date', 'created_at', 'updated_at'];
+    
+    protected $fillable = [
+        'user_id',
+        'reason',
+        'description',
+        'start_date',
+        'end_date',
+        'status'
+    ];
+
+    protected $dates = [
+        'start_date',
+        'end_date',
+        'created_at',
+        'updated_at',
+        'deleted_at'
+    ];
 
     public function user()
     {

@@ -7,6 +7,7 @@ use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -100,15 +101,25 @@ class UserController extends Controller
      * Display the specified resource.
      */
     public function show($id)
-    {
-        try {
-            $user = User::with('role')->findOrFail($id);
-            return view('admin.user.show', compact('user'));
-        } catch (\Exception $e) {
-            Log::error('Error showing user', ['error' => $e->getMessage(), 'id' => $id]);
-            return back()->with('error', 'User not found');
+{
+    try {
+        $user = User::with('role')->findOrFail($id);
+        
+        if (request()->ajax()) {
+            return view('admin.user.modal', compact('user'));
         }
+        
+        return view('admin.user.show', compact('user'));
+    } catch (\Exception $e) {
+        Log::error('Error showing user', ['error' => $e->getMessage(), 'id' => $id]);
+        
+        if (request()->ajax()) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        
+        return back()->with('error', 'User not found');
     }
+}
 
     /**
      * Show the form for editing the specified resource.
@@ -163,6 +174,109 @@ class UserController extends Controller
             return back()->with('error', 'Error updating user: ' . $e->getMessage())->withInput();
         }
     }
+
+    // Ganti method resetPassword di UserController dengan ini:
+
+public function resetPassword(Request $request, User $user)
+{
+    // Check admin session
+    if (!session('is_admin') || !session('admin_id')) {
+        return redirect()->route('admin.login')->with('message', 'Please login as admin');
+    }
+
+    // Validate the new password
+    $request->validate([
+        'new_password' => 'required|string|min:6|confirmed'
+    ]);
+
+    try {
+        // Update user's password
+        $user->update([
+            'password' => Hash::make($request->new_password)
+        ]);
+        
+        // Log the password reset
+        Log::info('Manual password reset for user', [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'admin_id' => session('admin_id')
+        ]);
+        
+        return back()->with([
+            'success' => 'Password for ' . $user->name . ' has been updated successfully!',
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Manual password reset failed', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id,
+            'admin_id' => session('admin_id')
+        ]);
+        
+        return back()->with('error', 'Password reset failed: ' . $e->getMessage());
+    }
+}
+
+// Atau buat method terpisah untuk reset password manual
+public function showResetPasswordForm(User $user)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+    
+    return view('admin.user.reset-password', compact('user'));
+}
+
+public function processResetPassword(Request $request, User $user)
+{
+    // Check admin session
+    if (!session('is_admin') || !session('admin_id')) {
+        return redirect()->route('admin.login')->with('message', 'Please login as admin');
+    }
+
+    // Validate the new password
+    $request->validate([
+        'new_password' => 'required|string|min:6|confirmed'
+    ]);
+
+    try {
+        $generateRandom = $request->has('generate_random');
+        
+        if ($generateRandom) {
+            $newPassword = Str::random(12);
+        } else {
+            $request->validate([
+                'new_password' => 'required|string|min:6|confirmed'
+            ]);
+            $newPassword = $request->new_password;
+        }
+        
+        // Update user's password
+        $user->update([
+            'password' => Hash::make($newPassword)
+        ]);
+        
+        // Log the password reset
+        Log::info('Manual password reset for user', [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'admin_id' => session('admin_id')
+        ]);
+        
+        return redirect()->route('admin.users.show', $user->id)
+            ->with('success', 'Password has been updated successfully!')
+            ->with('new_password', $newPassword);
+        
+    } catch (\Exception $e) {
+        Log::error('Manual password reset failed', [
+            'error' => $e->getMessage(),
+            'user_id' => $user->id,
+            'admin_id' => session('admin_id')
+        ]);
+        
+        return back()->with('error', 'Password reset failed: ' . $e->getMessage());
+    }
+}
 
     /**
      * Remove the specified resource from storage.
