@@ -71,9 +71,6 @@
                 <option value="Hadir">Hadir</option>
                 <option value="Terlambat">Terlambat</option>
                 <option value="Sakit">Sakit</option>
-                <option value="Izin">Izin</option>
-                <option value="Dinas Luar">Dinas Luar</option>
-                <option value="WFH">Work From Home</option>
             </select>
             <small class="form-text text-muted" id="description-info">
                 <i class="fas fa-info-circle"></i> 

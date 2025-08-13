@@ -11,18 +11,37 @@ class ConcessionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if (!session('is_admin') && session('role_id') != 3) {
             return redirect()->route('admin.login');
         }
 
+        $search = $request->get('search');
+
         if (session('role_id') == 3) { // If user is karyawan
             $concessions = Concession::where('user_id', session('user_id'))
+                            ->when($search, function($q) use ($search) {
+                                $q->where(function($query) use ($search) {
+                                    $query->where('reason', 'like', "%$search%")
+                                          ->orWhere('description', 'like', "%$search%")
+                                          ->orWhere('status', 'like', "%$search%");
+                                });
+                            })
                             ->orderBy('created_at', 'desc')
                             ->paginate(10);
         } else {
             $concessions = Concession::with('user')
+                            ->when($search, function($q) use ($search) {
+                                $q->where(function($query) use ($search) {
+                                    $query->where('reason', 'like', "%$search%")
+                                          ->orWhere('description', 'like', "%$search%")
+                                          ->orWhere('status', 'like', "%$search%")
+                                          ->orWhereHas('user', function($q) use ($search) {
+                                              $q->where('name', 'like', "%$search%");
+                                          });
+                                });
+                            })
                             ->orderBy('created_at', 'desc')
                             ->paginate(10);
         }

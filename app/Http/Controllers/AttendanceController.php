@@ -26,10 +26,23 @@ class AttendanceController extends Controller
     try {
         // Get all roles
         $roles = Role::whereNull('deleted_at')->get();
-        
+
+        $search = $request->get('search');
+
         $query = User::withCount('attendances')
             ->with(['latestAttendance'])
             ->with('role')
+            ->when($search, function($q) use ($search) {
+                $q->where(function($query) use ($search) {
+                    $query->where('name', 'like', "%$search%")
+                          ->orWhereHas('role', function($q) use ($search) {
+                              $q->where('role_name', 'like', "%$search%");
+                          })
+                          ->orWhereHas('latestAttendance', function($q) use ($search) {
+                              $q->where('description', 'like', "%$search%");
+                          });
+                });
+            })
             ->when($request->has('role_id') && $request->role_id != 'all', function($q) use ($request) {
                 $q->where('role_id', $request->role_id);
             })

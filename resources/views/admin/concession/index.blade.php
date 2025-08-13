@@ -46,8 +46,8 @@
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $concession->user->name }}</td>
                         <td>{{ ucfirst($concession->reason) }}</td>
-                        <td>{{ $concession->start_date ? $concession->start_date->format('d M Y') : 'N/A' }}</td>
-                        <td>{{ $concession->end_date ? $concession->end_date->format('d M Y') : 'N/A' }}</td>
+                        <td>{{ $concession->start_date ? $concession->start_date->locale('id')->isoFormat('D MMMM YYYY') : 'N/A' }}</td>
+                        <td>{{ $concession->end_date ? $concession->end_date->locale('id')->isoFormat('D MMMM YYYY') : 'N/A' }}</td>
                         <td>
                             <span class="badge badge-{{ 
                                 $concession->status == 'approved' ? 'success' : 

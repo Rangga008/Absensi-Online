@@ -43,11 +43,11 @@
 
     <div class="container">
 
-        <div class="content mt-5 col-md-4 offset-md-4">
+        <div class="content mt-1 col-md-1 offset-md-1">
 
             <div class="mb-3">
                 <h2>Sistem Presensi Online</h2>
-                <small>PT. Codepolitan Integrasi Indonesia</small>
+                <small>SMKN 2 Bandung</small>
             </div>
             <div class="alert alert-danger">Email dan password belum terdaftar</div>
             <form class="mt-4" action="home.html">
@@ -65,7 +65,7 @@
 
     <div id="footer">
         <div class="text-center">
-            Copyright &copy; 2021 Alfian Pratama
+            Copyright &copy; 2025 K
         </div>
     </div>
 

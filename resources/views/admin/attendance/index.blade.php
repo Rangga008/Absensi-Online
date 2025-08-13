@@ -211,7 +211,7 @@
                                 @if($user->latestAttendance)
                                     <div class="last-attendance">
                                         <span class="last-attendance-date">
-                                            {{ $user->latestAttendance->present_at->format('M d, Y') }}
+                                            {{ $user->latestAttendance->present_at->locale('id')->isoFormat('D MMMM YYYY') }}
                                         </span>
                                         <span class="last-attendance-time text-muted">
                                             {{ $user->latestAttendance->present_at->format('H:i') }}

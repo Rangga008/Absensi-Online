@@ -33,9 +33,6 @@
                         <td>{{ $role->role_name }}</td>
                         <td>{{ $role->created_at->format('d M Y') }}</td>
                         <td>
-                            <a href="{{ route('admin.roles.show', $role->id) }}" class="btn btn-info btn-sm">
-                                <i class="fas fa-eye"></i>
-                            </a>
                             <a href="{{ route('admin.roles.edit', $role->id) }}" class="btn btn-primary btn-sm">
                                 <i class="fas fa-edit"></i>
                             </a>
