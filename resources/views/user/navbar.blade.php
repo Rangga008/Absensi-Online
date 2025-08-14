@@ -31,7 +31,7 @@
             <div class="d-flex align-items-center">
                 @auth
                     <span class="text-white mr-3">Hai, {{ Auth::user()->name }}</span>
-                    <form action="{{ route('logout') }}" method="POST">
+                    <form action="{{ route('user.logout') }}" method="POST">
                         @csrf
                         <button type="submit" class="btn btn-outline-light btn-sm">
                             <i class="fas fa-sign-out-alt mr-1"></i> Logout
