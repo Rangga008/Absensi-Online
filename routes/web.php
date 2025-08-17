@@ -130,3 +130,31 @@ Route::get('/debug-session', function () {
         'admin_id' => session('admin_id'),
     ];
 });
+
+// Add to routes/web.php
+Route::get('/test-photo', function() {
+    $path = 'attendance-photos/attendance_1755400464_1.jpg';
+    
+    // Method 1: Via Storage
+    if (!Storage::disk('public')->exists($path)) {
+        return response('File not found in storage', 404);
+    }
+
+    // Method 2: Direct filesystem check
+    $fullPath = storage_path('app/public/'.$path);
+    if (!file_exists($fullPath)) {
+        return response('File not found in filesystem', 404);
+    }
+
+    return response()->json([
+        'storage_url' => Storage::url($path),
+        'direct_url' => url('/storage/'.$path),
+        'filesystem_path' => $fullPath,
+        'mime_type' => Storage::disk('public')->mimeType($path),
+        'size' => Storage::disk('public')->size($path),
+        'modified' => date('Y-m-d H:i:s', Storage::disk('public')->lastModified($path))
+    ]);
+});
+
+Route::post('/attendance/check-status', [AttendanceController::class, 'checkAttendanceStatus'])
+    ->name('attendance.check-status');

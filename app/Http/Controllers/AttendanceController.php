@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class AttendanceController extends Controller
 {
@@ -58,6 +59,7 @@ class AttendanceController extends Controller
                 });
             });
             
+            
         // Handle sorting
         if ($request->has('sort')) {
             $sortColumn = $request->get('sort');
@@ -82,6 +84,7 @@ class AttendanceController extends Controller
             // Default sorting
             $query->orderBy('name', 'asc');
         }
+        
 
         $users = $query->paginate(10);
 
@@ -160,66 +163,143 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
      * Store new attendance record (admin)
      */
      public function store(Request $request)
-    {
-        if (!session('is_admin')) {
-            return redirect()->route('admin.login');
+{
+    \Log::info('Attendance submission attempt', $request->all());
+
+    $validated = $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'latitude' => 'required|numeric',
+        'longitude' => 'required|numeric',
+        'description' => 'required|in:Hadir,Terlambat,Sakit,Izin',
+        'photo' => 'required|string',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        // Calculate distance
+        $distance = $this->calculateDistance(
+            $validated['latitude'],
+            $validated['longitude'],
+            -6.906000,
+            107.623400
+        );
+
+        // Location validation
+        if (in_array($validated['description'], ['Hadir', 'Terlambat']) && $distance > 500) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda berada di luar radius 500m dari sekolah'
+            ], 400);
         }
 
-        $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'present_date' => 'required|date',  // Terima input date terpisah
-            'present_time' => 'required',       // Terima input time terpisah
-            'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+        // Process photo
+        $photoPath = null;
+        if ($validated['photo']) {
+            $image = $validated['photo'];
+            
+            if (strpos($image, 'data:image') === 0) {
+                $image = preg_replace('#^data:image/\w+;base64,#i', '', $image);
+            }
+            
+            $image = str_replace(' ', '+', $image);
+            $imageData = base64_decode($image);
+            
+            if (!@imagecreatefromstring($imageData)) {
+                throw new \Exception('Invalid image data');
+            }
+            
+            $imageName = 'attendance_' . $validated['user_id'] . '_' . time() . '.jpg';
+            $path = 'attendance-photos/' . $imageName;
+            
+            // Store the image
+            $stored = Storage::disk('public')->put($path, $imageData);
+            
+            if (!$stored) {
+                throw new \Exception('Failed to save image to storage');
+            }
+            
+            $photoPath = $path;
+            \Log::info('Photo saved', ['path' => $photoPath]);
+        }
+
+        // Create attendance record
+        $attendance = Attendance::create([
+            'user_id' => $validated['user_id'],
+            'present_at' => now(),
+            'present_date' => now()->format('Y-m-d'),
+            'description' => $validated['description'],
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'photo_path' => $photoPath, // Make sure this matches your database column
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'distance' => $distance
         ]);
 
-        try {
-            // Gabungkan date dan time menjadi datetime
-            $presentAt = Carbon::createFromFormat(
-                'Y-m-d H:i', 
-                $validated['present_date'] . ' ' . $validated['present_time']
-            );
+        DB::commit();
 
-            Attendance::create([
-                'user_id' => $validated['user_id'],
-                'present_at' => $presentAt,
-                'present_date' => $validated['present_date'],
-                'description' => $validated['description'],
-                'latitude' => $validated['latitude'],
-                'longitude' => $validated['longitude'],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Absensi berhasil dicatat',
+            'data' => $attendance
+        ]);
 
-            return redirect()->route('admin.attendances.index')
-                ->with('success', 'Absensi berhasil ditambahkan');
-        } catch (\Exception $e) {
-            Log::error('Error storing attendance', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return back()->with('error', 'Gagal menyimpan absensi: ' . $e->getMessage())->withInput();
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Attendance error', ['error' => $e->getMessage()]);
+        
+        // Delete the photo if it was saved but the transaction failed
+        if (isset($photoPath) && Storage::disk('public')->exists($photoPath)) {
+            Storage::disk('public')->delete($photoPath);
         }
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal menyimpan absensi: ' . $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * Show attendance details
      */
-    public function show($id)
-    {
-        if (!session('is_admin')) {
-            return redirect()->route('admin.login');
-        }
-
-        try {
-            $attendance = Attendance::with('user')->findOrFail($id);
-            return view('admin.attendance.show', compact('attendance'));
-        } catch (\Exception $e) {
-            Log::error('Error showing attendance', ['error' => $e->getMessage(), 'id' => $id]);
-            return back()->with('error', 'Attendance not found');
-        }
+    /**
+ * Show attendance details
+ */
+public function show($id)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
     }
+
+    try {
+        $attendance = Attendance::with('user')->findOrFail($id);
+        
+        // Get recent attendances for the same user (excluding current one)
+        $recentAttendances = Attendance::where('user_id', $attendance->user_id)
+            ->where('id', '!=', $id)
+            ->orderBy('present_at', 'desc')
+            ->limit(5)
+            ->get();
+               $photoPath = $attendance->photo_path;
+    $exists = Storage::disk('public')->exists($photoPath);
+    $fullPath = storage_path('app/public/'.$photoPath);
+    
+    Log::info('Photo debug', [
+        'photo_path' => $photoPath,
+        'exists' => $exists,
+        'full_path' => $fullPath,
+        'url' => Storage::url($photoPath)
+    ]);
+
+        return view('admin.attendance.show', compact('attendance', 'recentAttendances'));
+    } catch (\Exception $e) {
+        Log::error('Error showing attendance', ['error' => $e->getMessage(), 'id' => $id]);
+        return back()->with('error', 'Attendance not found');
+    }
+}
 
     /**
      * Show attendance edit form
@@ -297,6 +377,11 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
         $attendance = Attendance::findOrFail($id);
         $userId = $attendance->user_id;
         $attendance->delete();
+
+        // Delete the photo if it exists
+    if ($attendance->photo_path && Storage::disk('public')->exists($attendance->photo_path)) {
+        Storage::disk('public')->delete($attendance->photo_path);
+    }
         
         // Clear user's attendance cache
         $this->clearUserAttendanceCache($userId);
@@ -315,6 +400,25 @@ private function clearUserAttendanceCache($userId)
     Cache::forget('user_attendance_'.$userId);
     
     // Anda juga bisa menambahkan log atau notifikasi ke user di sini
+}
+
+// Add this method to your AttendanceController
+public function checkAttendanceStatus(Request $request)
+{
+    $userId = $request->input('user_id');
+    
+    $attendance = Attendance::where('user_id', $userId)
+        ->whereDate('present_at', now())
+        ->first();
+
+    return response()->json([
+        'can_attend' => is_null($attendance),
+        'attendance' => $attendance ? [
+            'time' => $attendance->present_at->format('H:i:s'),
+            'description' => $attendance->description,
+            'photo_url' => $attendance->photo_path ? asset('storage/'.$attendance->photo_path) : null
+        ] : null
+    ]);
 }
 
 // Tambahkan method baru untuk menampilkan attendance per user

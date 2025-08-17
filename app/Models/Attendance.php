@@ -15,16 +15,23 @@ class Attendance extends Model
 
     protected $fillable = [
         'user_id',
-        'present_at',
         'description',
         'latitude',
         'longitude',
+        'photo_path',
+        'ip_address',
+        'user_agent',
+        'distance',
+        'present_date',
+        'present_at',
     ];
 
     protected $casts = [
         'present_at' => 'datetime',
+        'present_date' => 'date',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
+        'distance' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -32,62 +39,89 @@ class Attendance extends Model
 
     protected $dates = [
         'present_at',
+        'present_date',
         'created_at',
         'updated_at',
         'deleted_at',
     ];
 
-    // Relationship with User
+    /**
+     * Relationship with User
+     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    // Scope for today's attendance
+    /**
+     * Scope for today's attendance
+     */
     public function scopeToday($query)
     {
-        return $query->whereDate('present_at', Carbon::today());
+        return $query->whereDate('present_date', now('Asia/Jakarta')->format('Y-m-d'));
     }
 
-    // Scope for specific user
+    /**
+     * Scope for specific user
+     */
     public function scopeForUser($query, $userId)
     {
         return $query->where('user_id', $userId);
     }
 
-    // Scope for date range
+    /**
+     * Scope for date range
+     */
     public function scopeDateRange($query, $startDate, $endDate)
     {
-        return $query->whereBetween('present_at', [$startDate, $endDate]);
+        return $query->whereBetween('present_date', [$startDate, $endDate]);
     }
 
-    // Scope for specific month
+    /**
+     * Scope for specific month
+     */
     public function scopeMonth($query, $month, $year = null)
     {
         $year = $year ?? Carbon::now()->year;
-        return $query->whereMonth('present_at', $month)
-                    ->whereYear('present_at', $year);
+        return $query->whereMonth('present_date', $month)
+                    ->whereYear('present_date', $year);
     }
 
-    // Accessor for formatted time
+    /**
+     * Get photo URL attribute
+     */
+    public function getPhotoUrlAttribute()
+    {
+        return $this->photo_path ? asset('storage/' . $this->photo_path) : null;
+    }
+
+    /**
+     * Accessor for formatted time
+     */
     public function getFormattedTimeAttribute()
     {
-        return $this->present_at->format('H:i:s');
+        return $this->present_at ? $this->present_at->setTimezone('Asia/Jakarta')->format('H:i:s') : null;
     }
 
-    // Accessor for formatted date
+    /**
+     * Accessor for formatted date
+     */
     public function getFormattedDateAttribute()
     {
-        return $this->present_at->format('d F Y');
+        return $this->present_date ? $this->present_date->format('d F Y') : null;
     }
 
-    // Accessor for formatted datetime
+    /**
+     * Accessor for formatted datetime
+     */
     public function getFormattedDateTimeAttribute()
     {
-        return $this->present_at->format('d F Y, H:i:s');
+        return $this->present_at ? $this->present_at->setTimezone('Asia/Jakarta')->format('d F Y, H:i:s') : null;
     }
 
-    // Accessor for status badge class
+    /**
+     * Accessor for status badge class
+     */
     public function getStatusBadgeClassAttribute()
     {
         switch ($this->description) {
@@ -108,17 +142,44 @@ class Attendance extends Model
         }
     }
 
-    // Check if location is available
+    /**
+     * Get status color for UI
+     */
+    public function getStatusColorAttribute()
+    {
+        switch ($this->description) {
+            case 'Hadir':
+                return 'success';
+            case 'Terlambat':
+                return 'warning';
+            case 'Sakit':
+                return 'info';
+            case 'Izin':
+                return 'secondary';
+            case 'Dinas Luar':
+                return 'primary';
+            case 'WFH':
+                return 'dark';
+            default:
+                return 'secondary';
+        }
+    }
+
+    /**
+     * Check if location is available
+     */
     public function hasLocation()
     {
         return !is_null($this->latitude) && !is_null($this->longitude);
     }
 
-    // Get distance from office (if location is available)
+    /**
+     * Get distance from office (if location is available)
+     */
     public function getDistanceFromOffice($officeLat = -6.906000000000, $officeLng = 107.623400000000)
     {
         if (!$this->hasLocation()) {
-            return null;
+            return $this->distance; // Return stored distance if available
         }
 
         return $this->calculateDistance(
@@ -129,7 +190,9 @@ class Attendance extends Model
         );
     }
 
-    // Calculate distance between two coordinates using Haversine formula
+    /**
+     * Calculate distance between two coordinates using Haversine formula
+     */
     public static function calculateDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $earthRadius = 6371000; // Earth radius in meters
@@ -148,20 +211,42 @@ class Attendance extends Model
         return $earthRadius * $c; // Distance in meters
     }
 
-    // Check if attendance is late (after 08:00)
+    /**
+     * Check if attendance is late (after 08:00)
+     */
     public function isLate()
     {
-        $attendanceTime = $this->present_at->format('H:i:s');
+        if (!$this->present_at) return false;
+        
+        $attendanceTime = $this->present_at->setTimezone('Asia/Jakarta')->format('H:i:s');
         return $attendanceTime > '08:00:00';
     }
 
-    // Check if attendance is on weekend
-    public function isWeekend()
+    /**
+     * Check if attendance is on time
+     */
+    public function getIsOnTimeAttribute()
     {
-        return $this->present_at->isWeekend();
+        if (!$this->present_at) return false;
+        
+        $attendanceTime = Carbon::parse($this->present_at)->setTimezone('Asia/Jakarta');
+        $lateThreshold = $attendanceTime->copy()->setTime(8, 0, 0);
+        
+        return $attendanceTime->lte($lateThreshold);
     }
 
-    // Get attendance statistics for a user in a specific month
+    /**
+     * Check if attendance is on weekend
+     */
+    public function isWeekend()
+    {
+        if (!$this->present_date) return false;
+        return Carbon::parse($this->present_date)->isWeekend();
+    }
+
+    /**
+     * Get attendance statistics for a user in a specific month
+     */
     public static function getMonthlyStats($userId, $month = null, $year = null)
     {
         $month = $month ?? Carbon::now()->month;
@@ -180,18 +265,27 @@ class Attendance extends Model
         ];
     }
 
-    // Check if user has attended today
+    /**
+     * Check if user has attended today
+     */
     public static function hasAttendedToday($userId)
     {
-        return self::forUser($userId)->today()->exists();
+        $today = now('Asia/Jakarta')->format('Y-m-d');
+        return self::forUser($userId)->whereDate('present_date', $today)->exists();
     }
 
-    // Get today's attendance for a user
+    /**
+     * Get today's attendance for a user
+     */
     public static function getTodayAttendance($userId)
     {
-        return self::forUser($userId)->today()->first();
+        $today = now('Asia/Jakarta')->format('Y-m-d');
+        return self::forUser($userId)->whereDate('present_date', $today)->first();
     }
 
+    /**
+     * Get latest attendance for user
+     */
     public function latestAttendance()
     {
         return $this->hasOne(Attendance::class)->latestOfMany('present_at');

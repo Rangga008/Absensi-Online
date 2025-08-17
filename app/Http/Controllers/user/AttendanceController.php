@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Collection;
 
 class AttendanceController extends Controller
 {
@@ -28,81 +31,132 @@ class AttendanceController extends Controller
     public function index()
     {
         return view('user.attendance');
-    }
+    }   
 
     /**
      * Process attendance submission
      */
     public function store(Request $request)
     {
-        DB::beginTransaction();
+        // Add detailed logging
+        Log::info('Attendance submission attempt', [
+            'data' => $request->except('photo'), // Don't log photo data
+            'headers' => $request->headers->all()
+        ]);
         
-        try {
-            // Validate request
-            $validated = $this->validateAttendanceRequest($request);
-            
-            // Check for duplicate attendance
-            $this->checkDuplicateAttendance($validated['user_id']);
-            
-            // Determine attendance status
-            $status = $this->determineAttendanceStatus(
-                $validated['description'],
-                Carbon::now('Asia/Jakarta')
-            );
-            
-            // Validate location if required
-            $distance = $this->validateAttendanceLocation(
-                $status,
-                $validated['latitude'] ?? null,
-                $validated['longitude'] ?? null
-            );
-            
-            // Create attendance record
-            $attendance = $this->createAttendanceRecord($validated, $status);
-            
-            DB::commit();
-            
-            return $this->attendanceSuccessResponse($attendance, $distance);
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
+            'photo' => 'required|string',
+        ]);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            DB::rollBack();
-            return $this->attendanceErrorResponse($e->validator->errors()->first(), 422);
-            
+        try {
+            // Check for duplicate attendance first
+            $this->checkDuplicateAttendance($validated['user_id']);
+
+            // Process photo
+            $photoPath = null;
+            if ($validated['photo']) {
+                $imageData = $validated['photo'];
+                
+                // Remove data URL prefix
+                if (strpos($imageData, 'data:image') === 0) {
+                    $imageData = preg_replace('#^data:image/\w+;base64,#i', '', $imageData);
+                }
+                
+                $imageData = str_replace(' ', '+', $imageData);
+                $decodedImage = base64_decode($imageData);
+                
+                // Validate image
+                if (!$decodedImage || !@imagecreatefromstring($decodedImage)) {
+                    throw new \Exception('Invalid image data');
+                }
+                
+                $imageName = 'attendance_'.time().'_'.$validated['user_id'].'.jpg';
+                $storagePath = 'attendance-photos/'.$imageName;
+                
+                // Store the image
+                Storage::disk('public')->put($storagePath, $decodedImage);
+                
+                if (!Storage::disk('public')->exists($storagePath)) {
+                    throw new \Exception('Failed to store image');
+                }
+                
+                $photoPath = $storagePath;
+            }
+
+            // Calculate distance
+            $distance = $this->calculateDistance(
+                $validated['latitude'],
+                $validated['longitude'],
+                self::SCHOOL_LATITUDE,
+                self::SCHOOL_LONGITUDE
+            );
+
+            // Create attendance record dengan semua field yang diperlukan
+            $attendance = Attendance::create([
+                'user_id' => $validated['user_id'],
+                'description' => $validated['description'],
+                'latitude' => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+                'photo_path' => $photoPath,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'distance' => $distance,
+                'present_date' => now('Asia/Jakarta')->format('Y-m-d'),
+                'present_at' => now('Asia/Jakarta'),
+            ]);
+
+            Log::info('Attendance created successfully', [
+                'attendance_id' => $attendance->id,
+                'user_id' => $validated['user_id']
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Absensi berhasil dicatat',
+                'data' => [
+                    'time' => $attendance->present_at->format('H:i:s'),
+                    'date' => $attendance->present_date,
+                    'distance' => round($distance),
+                    'photo_url' => $photoPath ? asset('storage/'.$photoPath) : null
+                ]
+            ]);
+
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Attendance error: ' . $e->getMessage(), [
-                'user_id' => $request->user_id ?? null,
-                'ip' => $request->ip(),
+            Log::error('Attendance error: '.$e->getMessage(), [
+                'user_id' => $validated['user_id'] ?? null,
                 'trace' => $e->getTraceAsString()
             ]);
             
-            return $this->attendanceErrorResponse(
-                'Terjadi kesalahan sistem. Silakan coba lagi.',
-                500,
-                config('app.debug') ? $e->getMessage() : null
-            );
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: '.$e->getMessage()
+            ], 500);
         }
     }
 
     /**
      * Check if user can attend today
      */
-   public function checkStatus(Request $request)
-{
-    $request->validate(['user_id' => 'required|exists:users,id']);
-    
-    $today = now('Asia/Jakarta')->format('Y-m-d');
-    $attendance = Attendance::where('user_id', $request->user_id)
-        ->whereDate('present_date', $today)
-        ->first();
+    public function checkStatus(Request $request)
+    {
+        $request->validate(['user_id' => 'required|exists:users,id']);
+        
+        $today = now('Asia/Jakarta')->format('Y-m-d');
+        $attendance = Attendance::where('user_id', $request->user_id)
+            ->whereDate('present_date', $today)
+            ->first();
 
-    return response()->json([
-        'can_attend' => is_null($attendance),
-        'attendance' => $attendance ? $this->formatAttendanceData($attendance) : null,
-        'server_time' => $this->currentServerTime(),
-        'force_check' => true // Tambahkan flag ini
-    ]);
-}
+        return response()->json([
+            'can_attend' => is_null($attendance),
+            'attendance' => $attendance ? $this->formatAttendanceData($attendance) : null,
+            'server_time' => $this->currentServerTime(),
+            'force_check' => true
+        ]);
+    }
 
     /**
      * Get attendance statistics
@@ -139,19 +193,6 @@ class AttendanceController extends Controller
                 'attendance_rate' => $workingDays > 0 ? round(($attendanceCount / $workingDays) * 100, 2) : 0,
             ],
             'server_time' => $this->currentServerTime()
-        ]);
-    }
-
-    // Helper methods (same as original, just move them here)
-     private function validateAttendanceRequest(Request $request)
-    {
-        return $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'request_id' => 'nullable|string|max:50',
-            'client_timestamp' => 'nullable|numeric'
         ]);
     }
 
@@ -233,25 +274,6 @@ class AttendanceController extends Controller
         }
 
         return $distance;
-    }
-
-    /**
-     * Create attendance record
-     */
-    private function createAttendanceRecord(array $data, string $status): Attendance
-    {
-        $now = Carbon::now('Asia/Jakarta');
-        
-        return Attendance::create([
-            'user_id' => $data['user_id'],
-            'present_at' => $now->toDateTimeString(),
-            'present_date' => $now->toDateString(),
-            'description' => $status,
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent()
-        ]);
     }
 
     /**
@@ -344,83 +366,32 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Successful attendance response
+     * Clear user attendance cache
      */
-    private function attendanceSuccessResponse(Attendance $attendance, ?float $distance = null): mixed
+    private function clearUserAttendanceCache($userId)
     {
-        $user = User::findOrFail($attendance->user_id);
-        $time = Carbon::parse($attendance->present_at)->setTimezone('Asia/Jakarta');
-
-        $response = [
-            'success' => true,
-            'message' => 'Absensi berhasil',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name
-                ],
-                'time' => $time->format('H:i:s'),
-                'date' => $time->format('d F Y'),
-                'status' => $attendance->description,
-                'distance' => $distance ? round($distance) : null,
-                'server_time' => $this->currentServerTime()
-            ]
-        ];
-
-        if (request()->ajax()) {
-            return response()->json($response);
-        }
-        
-        return redirect()->route('admin.attendances.index')->with('success', 'Absensi berhasil');
+        Cache::forget('user_attendance_'.$userId);
     }
 
     /**
-     * Error attendance response
+     * Get user attendances (admin function)
      */
-    private function attendanceErrorResponse(string $message, int $status = 400, ?string $debug = null): mixed
+    public function userAttendances($userId)
     {
-        $response = [
-            'success' => false,
-            'message' => $message,
-            'server_time' => $this->currentServerTime()
-        ];
-
-        if ($debug) {
-            $response['debug'] = $debug;
-        }
-
-        if (request()->ajax()) {
-            return response()->json($response, $status);
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
         }
         
-        return back()->with('error', $message);
+        try {
+            $user = User::findOrFail($userId);
+            $attendances = Attendance::where('user_id', $userId)
+                ->orderBy('present_at', 'desc')
+                ->paginate(10);
+
+            return view('admin.attendance.user_attendances', compact('user', 'attendances'));
+        } catch (\Exception $e) {
+            Log::error('Error loading user attendances', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error loading attendances: ' . $e->getMessage());
+        }
     }
-
-    private function clearUserAttendanceCache($userId)
-{
-    // Clear server-side cache if any
-    Cache::forget('user_attendance_'.$userId);
-    
-    // Anda juga bisa menambahkan log atau notifikasi ke user di sini
-}
-
-public function userAttendances($userId)
-{
-    if (!session('is_admin')) {
-        return redirect()->route('admin.login');
-    }
-    
-    try {
-        $user = User::findOrFail($userId);
-        $attendances = Attendance::where('user_id', $userId)
-            ->orderBy('present_at', 'desc')
-            ->paginate(10);
-
-        return view('admin.attendance.user_attendances', compact('user', 'attendances'));
-    } catch (\Exception $e) {
-        Log::error('Error loading user attendances', ['error' => $e->getMessage()]);
-        return back()->with('error', 'Error loading attendances: ' . $e->getMessage());
-    }
-}
-
 }

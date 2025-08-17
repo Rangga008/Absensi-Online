@@ -71,6 +71,11 @@
                                 class="btn btn-sm btn-primary">
                                     <i class="fas fa-edit"></i>
                                 </a>
+                            
+                                <a href="{{ route('admin.attendances.show', $attendance->id) }}" 
+                                class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
                             </td>
                         </tr>
                     @endforeach

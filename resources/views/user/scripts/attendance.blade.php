@@ -8,6 +8,10 @@ const DEBOUNCE_TIME = 500; // Debounce time in ms
 const LOCATION_REFRESH_INTERVAL = 30000; // 30 seconds
 const ATTENDANCE_CHECK_INTERVAL = 15000; // 15 seconds
 
+// Camera variables
+let stream = null;
+let photoTaken = false;
+
 // Global variables
 let map;
 let userMarker;
@@ -49,6 +53,81 @@ function initMap() {
         fillOpacity: 0.1,
         radius: MAX_DISTANCE
     }).addTo(map).bindPopup('Area Absensi (Radius ' + MAX_DISTANCE + ' meter)');
+}
+
+// Camera Functions
+async function startCamera() {
+    try {
+        const constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: 'user'
+            }
+        };
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('camera-video');
+        video.srcObject = stream;
+        
+        document.getElementById('start-camera').style.display = 'none';
+        document.getElementById('take-photo').style.display = 'inline-block';
+        
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        showAlert('Tidak dapat mengakses kamera. Pastikan izin kamera diizinkan.', 'danger');
+    }
+}
+
+function takePhoto() {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+    const context = canvas.getContext('2d');
+    
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw current video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    if (!imageData.startsWith('data:image/jpeg;base64,')) {
+        showAlert('Format foto tidak valid', 'danger');
+        return;
+    }
+    
+    // Display preview
+    document.getElementById('photo-preview').src = imageData;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('no-photo').style.display = 'none';
+    document.getElementById('photo-data').value = imageData;
+    
+    // Update button visibility
+    document.getElementById('take-photo').style.display = 'none';
+    document.getElementById('retake-photo').style.display = 'inline-block';
+    
+    photoTaken = true;
+    
+    // Stop camera stream
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+}
+
+function retakePhoto() {
+    // Reset photo state
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('no-photo').style.display = 'flex';
+    document.getElementById('photo-data').value = '';
+    
+    // Reset buttons
+    document.getElementById('retake-photo').style.display = 'none';
+    document.getElementById('start-camera').style.display = 'inline-block';
+    
+    photoTaken = false;
 }
 
 // Get user location with high accuracy
@@ -233,108 +312,116 @@ document.getElementById('attendance').addEventListener('click', function(e) {
 });
 
 // Process attendance submission
-function processAttendance() {
+async function processAttendance() {
     // Prevent multiple submissions
     if (isSubmittingAttendance || hasAttendedToday || attendanceProcessed) {
         return;
     }
 
-    const userId = document.getElementById('user_id').value;
-    const description = document.getElementById('description').value;
-    const latitude = document.getElementById('user_lat').value;
-    const longitude = document.getElementById('user_lng').value;
-    
-    // Validate description
-    if (!description) {
-        showAlert('Silakan pilih keterangan absensi terlebih dahulu!', 'danger');
-        return;
-    }
-    
-    // Set submission state
-    isSubmittingAttendance = true;
-    attendanceProcessed = true;
-    disableForm(true);
-    
-    // Generate unique request ID
-    const requestId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    document.getElementById('request_id').value = requestId;
-    
-    // Validate location for certain statuses
-    const exemptDescriptions = ['WFH', 'Sakit', 'Izin'];
-    if (!exemptDescriptions.includes(description)) {
-        if (!latitude || !longitude) {
-            showAlert('Lokasi tidak terdeteksi. Pastikan GPS aktif dan izinkan akses lokasi.', 'danger');
-            resetFormState();
-            return;
+    try {
+        const userId = document.getElementById('user_id').value;
+        const description = document.getElementById('description').value;
+        const latitude = document.getElementById('user_lat').value;
+        const longitude = document.getElementById('user_lng').value;
+        const photoData = document.getElementById('photo-data').value;
+
+        // Validate all required fields
+        if (!userId) {
+            throw new Error('User ID is required');
         }
-        
-        const distance = calculateDistance(
-            parseFloat(latitude), 
-            parseFloat(longitude), 
-            OFFICE_LAT, 
-            OFFICE_LNG
-        );
-        
-        if (distance > MAX_DISTANCE) {
-            const confirmMsg = `Anda berada ${Math.round(distance)} meter dari sekolah (maksimal ${MAX_DISTANCE} meter). ` +
-                             `Apakah Anda yakin ingin melanjutkan absensi dengan status "${description}"?`;
-            if (!confirm(confirmMsg)) {
-                resetFormState();
-                return;
+        if (!description) {
+            throw new Error('Silakan pilih keterangan absensi terlebih dahulu!');
+        }
+        if (!photoData) {
+            throw new Error('Silakan ambil foto untuk absensi terlebih dahulu!');
+        }
+
+        // Validate description values
+        const validDescriptions = ['Hadir', 'Terlambat', 'Sakit', 'Izin'];
+        if (!validDescriptions.includes(description)) {
+            throw new Error('Description must be one of: Hadir, Terlambat, Sakit, Izin');
+        }
+
+        // Validate location for certain statuses
+        const exemptDescriptions = ['Sakit', 'Izin'];
+        if (!exemptDescriptions.includes(description)) {
+            if (!latitude || !longitude) {
+                throw new Error('Lokasi tidak terdeteksi. Pastikan GPS aktif dan izinkan akses lokasi.');
+            }
+            
+            const distance = calculateDistance(
+                parseFloat(latitude), 
+                parseFloat(longitude), 
+                OFFICE_LAT, 
+                OFFICE_LNG
+            );
+            
+            if (distance > MAX_DISTANCE) {
+                const confirmMsg = `Anda berada ${Math.round(distance)} meter dari sekolah (maksimal ${MAX_DISTANCE} meter). ` +
+                                 `Apakah Anda yakin ingin melanjutkan absensi dengan status "${description}"?`;
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
             }
         }
-    }
-    
-    // Prepare attendance data
-    const attendanceData = {
-        user_id: userId,
-        description: description,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        client_timestamp: Date.now(),
-        request_id: requestId
-    };
-    
-    // Store request ID in session storage
-    sessionStorage.setItem('current_attendance_request', requestId);
-    
-    // Send attendance data with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    
-    fetch('{{ route("attendance.store") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        signal: controller.signal,
-        body: JSON.stringify(attendanceData)
-    })
-    .then(response => {
+
+        // Set submission state
+        isSubmittingAttendance = true;
+        attendanceProcessed = true;
+        disableForm(true);
+
+        // Prepare attendance data with correct field names
+        const attendanceData = {
+            user_id: parseInt(userId),
+            latitude: latitude ? parseFloat(latitude) : 0,
+            longitude: longitude ? parseFloat(longitude) : 0,
+            description: description,
+            photo: photoData
+        };
+
+        console.log('Submitting payload:', attendanceData);
+
+        // Send attendance data with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        const response = await fetch('/api/attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: controller.signal,
+            body: JSON.stringify(attendanceData)
+        });
+
         clearTimeout(timeoutId);
-        if (!response.ok) {
-            return response.json().then(err => Promise.reject(err));
-        }
-        return response.json();
-    })
-    .then(data => {
-        sessionStorage.removeItem('current_attendance_request');
+
+        const data = await response.json();
         
+        if (!response.ok) {
+            console.error('Validation errors:', data.errors || data);
+            if (data.errors) {
+                const errorMessages = Object.values(data.errors).flat().join('\n');
+                throw new Error(errorMessages);
+            } else {
+                throw new Error(data.message || 'Attendance submission failed');
+            }
+        }
+
         if (data.success) {
             handleAttendanceSuccess(data, userId);
         } else {
             throw new Error(data.message || 'Terjadi kesalahan');
         }
-    })
-    .catch(error => {
-        clearTimeout(timeoutId);
-        sessionStorage.removeItem('current_attendance_request');
-        
+
+    } catch (error) {
         console.error('Attendance error:', error);
-        handleAttendanceError(error, userId);
-    });
+        showAlert(error.message, 'danger');
+        resetFormState();
+    }
 }
 
 // Handle successful attendance submission
@@ -416,38 +503,26 @@ function disableForm(disabled) {
 }
 
 // Check if user already attended today
+// Update this in your attendance.js file
 function checkTodayAttendance() {
     const userId = document.getElementById('user_id').value;
-    const today = new Date().toDateString();
     
-    // Check with server first, ignore localStorage
     fetch('{{ route("attendance.check-status") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
         },
         body: JSON.stringify({ user_id: userId })
     })
     .then(response => response.json())
     .then(data => {
         if (!data.can_attend && data.attendance) {
-            localStorage.setItem('attended_today_' + userId, today);
             markAsAttended(data.attendance);
-        } else {
-            // Clear localStorage jika tidak ada absensi
-            localStorage.removeItem('attended_today_' + userId);
-            resetFormState();
         }
     })
     .catch(error => {
-        console.error('Error checking attendance status:', error);
-        // Fallback ke localStorage jika server error
-        const storedAttendance = localStorage.getItem('attended_today_' + userId);
-        if (storedAttendance === today) {
-            markAsAttended();
-        }
+        console.error('Error checking attendance:', error);
     });
 }
 
@@ -554,6 +629,11 @@ document.getElementById('description').addEventListener('change', function() {
     }
 });
 
+// Camera event listeners
+document.getElementById('start-camera').addEventListener('click', startCamera);
+document.getElementById('take-photo').addEventListener('click', takePhoto);
+document.getElementById('retake-photo').addEventListener('click', retakePhoto);
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     clearOldAttendanceData();
@@ -610,6 +690,27 @@ style.textContent = `
     
     .leaflet-control-attribution {
         font-size: 10px;
+    }
+    
+    .camera-container {
+        position: relative;
+    }
+    
+    #camera-video {
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .camera-controls {
+        text-align: center;
+    }
+    
+    .photo-preview {
+        position: relative;
+    }
+    
+    #photo-preview {
+        border-radius: 8px;
     }
 `;
 document.head.appendChild(style);

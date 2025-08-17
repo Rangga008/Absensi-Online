@@ -16,6 +16,46 @@
         <i class="fas fa-info-circle"></i> Mengambil lokasi Anda...
     </div>
 
+    <!-- Camera Section -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-camera"></i> Foto Absensi</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="camera-container">
+                        <video id="camera-video" width="100%" height="300" autoplay muted></video>
+                        <canvas id="camera-canvas" style="display: none;"></canvas>
+                        <div class="camera-controls mt-2">
+                            <button type="button" class="btn btn-primary" id="start-camera">
+                                <i class="fas fa-video"></i> Buka Kamera
+                            </button>
+                            <button type="button" class="btn btn-success" id="take-photo" style="display: none;">
+                                <i class="fas fa-camera"></i> Ambil Foto
+                            </button>
+                            <button type="button" class="btn btn-warning" id="retake-photo" style="display: none;">
+                                <i class="fas fa-redo"></i> Ambil Ulang
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="photo-preview">
+                        <img id="photo-preview" style="width: 100%; height: 300px; object-fit: cover; border: 1px solid #ddd; border-radius: 8px; display: none;">
+                        <div id="no-photo" class="text-center text-muted" style="height: 300px; display: flex; align-items: center; justify-content: center; border: 2px dashed #ddd; border-radius: 8px;">
+                            <div>
+                                <i class="fas fa-camera fa-3x mb-2"></i>
+                                <p>Foto absensi akan muncul di sini</p>
+                            </div>
+                        </div>
+                        <input type="hidden" id="photo-data" name="photo_data">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Map Container -->
     <div class="mt-3 mb-3">
         <div class="card">
