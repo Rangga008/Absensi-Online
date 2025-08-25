@@ -76,14 +76,18 @@ class HomeController extends Controller
 {
     $userId = session('user_id');
     
-    $histories = DB::table('attendance')
-        ->select('id', 'present_at', 'description', 'created_at')
-        ->where('user_id', $userId)
-        ->union(
-            DB::table('concession')
-                ->select('id', 'reason as present_at', 'description', 'created_at')
-                ->where('user_id', $userId)
-        )
+    // Query untuk attendance (kehadiran)
+    $attendance = DB::table('attendance')
+        ->select('id', 'present_at', 'description', 'created_at', DB::raw("'hadir' as type"), DB::raw("NULL as status"))
+        ->where('user_id', $userId);
+    
+    // Query untuk concession (izin) dengan status
+    $concession = DB::table('concession')
+        ->select('id', 'reason as present_at', 'description', 'created_at', DB::raw("'izin' as type"), 'status')
+        ->where('user_id', $userId);
+    
+    // Gabungkan kedua query
+    $histories = $attendance->union($concession)
         ->orderBy('created_at', 'desc')
         ->limit(7)
         ->get()

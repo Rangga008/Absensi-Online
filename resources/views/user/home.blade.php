@@ -68,7 +68,7 @@
             </a>
         </div>
         <div class="col-md-6 mb-3">
-            <a href="{{ url('user/concession') }}" class="card action-card h-100 text-decoration-none">
+            <a href="{{ route('user.concession.create') }}" class="card action-card h-100 text-decoration-none">
                 <div class="card-body text-center">
                     <div class="action-icon bg-warning-light text-warning mb-3">
                         <i class="fas fa-envelope-open-text"></i>

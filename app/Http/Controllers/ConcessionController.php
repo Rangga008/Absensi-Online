@@ -5,65 +5,137 @@ namespace App\Http\Controllers;
 use App\Models\Concession;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class ConcessionController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Display concession form for user
      */
-    public function index(Request $request)
+    public function createForUser()
     {
-        if (!session('is_admin') && session('role_id') != 3) {
-            return redirect()->route('admin.login');
-        }
-
-        $search = $request->get('search');
-
-        if (session('role_id') == 3) { // If user is karyawan
-            $concessions = Concession::where('user_id', session('user_id'))
-                            ->when($search, function($q) use ($search) {
-                                $q->where(function($query) use ($search) {
-                                    $query->where('reason', 'like', "%$search%")
-                                          ->orWhere('description', 'like', "%$search%")
-                                          ->orWhere('status', 'like', "%$search%");
-                                });
-                            })
-                            ->orderBy('created_at', 'desc')
-                            ->paginate(10);
-        } else {
-            $concessions = Concession::with('user')
-                            ->when($search, function($q) use ($search) {
-                                $q->where(function($query) use ($search) {
-                                    $query->where('reason', 'like', "%$search%")
-                                          ->orWhere('description', 'like', "%$search%")
-                                          ->orWhere('status', 'like', "%$search%")
-                                          ->orWhereHas('user', function($q) use ($search) {
-                                              $q->where('name', 'like', "%$search%");
-                                          });
-                                });
-                            })
-                            ->orderBy('created_at', 'desc')
-                            ->paginate(10);
+        if (!session('user_id')) {
+            return redirect()->route('login');
         }
         
-        return view('admin.concession.index', compact('concessions'));
+        return view('user.concession.create');
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Store concession for user
      */
-    public function create()
+    public function storeForUser(Request $request)
     {
+        if (!session('user_id')) {
+            return redirect()->route('login');
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|in:sakit,izin,cuti',
+            'description' => 'required|string|min:5|max:500',
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date'
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $concession = Concession::create([
+                'user_id' => session('user_id'),
+                'reason' => $validated['reason'],
+                'description' => $validated['description'],
+                'start_date' => $validated['start_date'],
+                'end_date' => $validated['end_date'],
+                'status' => 'pending'
+            ]);
+
+            DB::commit();
+            
+            return redirect()->route('user.home')
+                   ->with('success', 'Pengajuan izin berhasil dibuat!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('User concession error: '.$e->getMessage());
+            return back()->withInput()
+                   ->with('error', 'Gagal menyimpan pengajuan izin');
+        }
+    }
+
+    /**
+     * Show concession history for user
+     */
+    public function userHistory(Request $request)
+    {
+        if (!session('user_id')) {
+            return redirect()->route('login');
+        }
+
+        $search = $request->get('search');
+        
+        $concessions = Concession::where('user_id', session('user_id'))
+                        ->when($search, function($q) use ($search) {
+                            $q->where(function($query) use ($search) {
+                                $query->where('reason', 'like', "%$search%")
+                                      ->orWhere('description', 'like', "%$search%")
+                                      ->orWhere('status', 'like', "%$search%");
+                            });
+                        })
+                        ->orderBy('created_at', 'desc')
+                        ->paginate(10);
+
+        return view('user.concession.history', compact('concessions'));
+    }
+
+    /**
+     * Display a listing of concessions for admin
+     */
+    public function index()
+    {
+        // Check if user is admin
         if (!session('is_admin')) {
             return redirect()->route('admin.login');
         }
 
-        $users = User::where('role_id', 4)->get(); // Only show karyawan users
-        return view('admin.concession.create', compact('users'));
+        try {
+            $concessions = Concession::with('user')
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+
+            $users = User::where('role_id', '!=', 1) // Exclude admin jika perlu
+                ->orderBy('name')
+                ->get();
+
+            return view('admin.concession.index', compact('concessions', 'users'));
+        } catch (\Exception $e) {
+            Log::error('Error loading concessions index: '.$e->getMessage());
+            return back()->with('error', 'Gagal memuat data pengajuan izin');
+        }
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Show the form for creating a new concession (admin)
+     */
+    public function create()
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+
+    try {
+        // Ambil semua user dengan role, bukan hanya role_id = 4
+        $users = User::with('role')->get();
+        
+        return view('admin.concession.create', compact('users'));
+    } catch (\Exception $e) {
+        Log::error('Error loading concession create form: '.$e->getMessage());
+        return back()->with('error', 'Gagal memuat form pengajuan izin');
+    }
+}
+
+    /**
+     * Store a newly created concession (admin)
      */
     public function store(Request $request)
     {
@@ -71,68 +143,141 @@ class ConcessionController extends Controller
             return redirect()->route('admin.login');
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'reason' => 'required|in:sakit,izin,cuti',
-            'description' => 'required|string|max:500',
+            'description' => 'required|string|min:5|max:500',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date'
         ]);
 
-        Concession::create([
-            'user_id' => $request->user_id,
-            'reason' => $request->reason,
-            'description' => $request->description,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'status' => 'pending'
-        ]);
+        DB::beginTransaction();
+        try {
+            Concession::create([
+                'user_id' => $validated['user_id'],
+                'reason' => $validated['reason'],
+                'description' => $validated['description'],
+                'start_date' => $validated['start_date'],
+                'end_date' => $validated['end_date'],
+                'status' => 'pending',
+                'approved_by' => session('user_id')
+            ]);
 
-        return redirect()->route('admin.concessions.index')
-               ->with('success', 'Concession created successfully!');
+            DB::commit();
+            return redirect()->route('admin.concession.index')
+                   ->with('success', 'Concession created successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Admin concession error: '.$e->getMessage());
+            return back()->withInput()
+                   ->with('error', 'Failed to create concession');
+        }
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Display the specified concession
+     */
+    public function show($id)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+
+    try {
+        // Load concession dengan relasi user dan approver
+        $concession = Concession::with(['user', 'approver'])
+            ->findOrFail($id);
+            
+        return view('admin.concession.show', compact('concession'));
+    } catch (\Exception $e) {
+        Log::error('Error loading concession: '.$e->getMessage(), [
+            'id' => $id,
+            'trace' => $e->getTraceAsString()
+        ]);
+        return back()->with('error', 'Gagal memuat detail pengajuan izin: ' . $e->getMessage());
+    }
+}
+
+    /**
+     * Show the form for editing the specified concession
      */
     public function edit($id)
-    {
-        if (!session('is_admin')) {
-            return redirect()->route('admin.login');
-        }
-
-        $concession = Concession::findOrFail($id);
-        $users = User::where('role_id', 4)->get(); // Only show karyawan users
-        return view('admin.concession.edit', compact('concession', 'users'));
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
     }
 
+    try {
+        $concession = Concession::with(['user', 'approver'])->findOrFail($id);
+        
+        // Ambil semua user dengan role karyawan (sesuaikan role_id)
+        $users = User::whereIn('role_id', [1, 2, 3, 4]) // Role karyawan
+                   ->orderBy('name')
+                   ->get();
+
+        return view('admin.concession.edit', compact('concession', 'users'));
+        
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        Log::error('Concession not found: '.$e->getMessage(), ['id' => $id]);
+        return redirect()->route('admin.concessions.index')
+               ->with('error', 'Data pengajuan izin tidak ditemukan');
+               
+    } catch (\Exception $e) {
+        Log::error('Error loading concession edit form: '.$e->getMessage(), [
+            'id' => $id,
+            'trace' => $e->getTraceAsString()
+        ]);
+        return redirect()->route('admin.concessions.index')
+               ->with('error', 'Gagal memuat form edit: ' . $e->getMessage());
+    }
+}
+
     /**
-     * Update the specified resource in storage.
+     * Update the specified concession
      */
     public function update(Request $request, $id)
-    {
-        if (!session('is_admin')) {
-            return redirect()->route('admin.login');
-        }
-
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'reason' => 'required|in:sakit,izin,cuti',
-            'description' => 'required|string|max:500',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'status' => 'required|in:pending,approved,rejected'
-        ]);
-
-        $concession = Concession::findOrFail($id);
-        $concession->update($request->all());
-
-        return redirect()->route('admin.concessions.index')
-               ->with('success', 'Concession updated successfully!');
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
     }
 
+    $validated = $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'reason' => 'required|in:sakit,izin,cuti',
+        'description' => 'required|string|min:5|max:500',
+        'start_date' => 'required|date',
+        'end_date' => 'required|date|after_or_equal:start_date',
+        'status' => 'required|in:pending,approved,rejected'
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $concession = Concession::findOrFail($id);
+        
+        // Add approval tracking if status changed to approved/rejected
+        if (in_array($validated['status'], ['approved', 'rejected']) && $concession->status !== $validated['status']) {
+            $validated['approved_by'] = session('user_id');
+            $validated['approved_at'] = now();
+        }
+
+        $concession->update($validated);
+        DB::commit();
+
+        Log::info('Concession updated', ['id' => $id, 'status' => $validated['status']]);
+        return redirect()->route('admin.concessions.index')
+               ->with('success', 'Pengajuan izin berhasil diperbarui!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error updating concession: '.$e->getMessage(), ['id' => $id, 'data' => $validated]);
+        return back()->withInput()
+               ->with('error', 'Gagal memperbarui pengajuan izin. Silakan coba lagi.');
+    }
+}
+
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified concession
      */
     public function destroy($id)
     {
@@ -140,10 +285,76 @@ class ConcessionController extends Controller
             return redirect()->route('admin.login');
         }
 
-        $concession = Concession::findOrFail($id);
-        $concession->delete();
+        DB::beginTransaction();
+        try {
+            $concession = Concession::findOrFail($id);
+            $concession->delete();
+            DB::commit();
 
-        return redirect()->route('admin.concessions.index')
-               ->with('success', 'Concession deleted successfully!');
+            Log::info('Concession deleted', ['id' => $id]);
+            return redirect()->route('admin.concessions.index')
+                   ->with('success', 'Pengajuan izin berhasil dihapus!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting concession: '.$e->getMessage(), ['id' => $id]);
+            return back()->with('error', 'Gagal menghapus pengajuan izin. Silakan coba lagi.');
+        }
+    }
+
+    /**
+     * Approve concession
+     */
+    public function approve($id)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        DB::beginTransaction();
+        try {
+            $concession = Concession::findOrFail($id);
+            $concession->update([
+                'status' => 'approved',
+                'approved_by' => session('user_id'),
+                'approved_at' => now()
+            ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Pengajuan izin disetujui!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error approving concession: '.$e->getMessage(), ['id' => $id]);
+            return back()->with('error', 'Gagal menyetujui pengajuan izin');
+        }
+    }
+
+    /**
+     * Reject concession
+     */
+    public function reject($id)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        DB::beginTransaction();
+        try {
+            $concession = Concession::findOrFail($id);
+            $concession->update([
+                'status' => 'rejected',
+                'approved_by' => session('user_id'),
+                'approved_at' => now()
+            ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Pengajuan izin ditolak!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error rejecting concession: '.$e->getMessage(), ['id' => $id]);
+            return back()->with('error', 'Gagal menolak pengajuan izin');
+        }
     }
 }

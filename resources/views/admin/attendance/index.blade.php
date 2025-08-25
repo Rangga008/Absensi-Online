@@ -141,30 +141,6 @@
 <div class="card shadow mb-4">
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
         <h6 class="m-0 font-weight-bold text-primary">Attendance Summary</h6>
-        
-        <div class="filter-controls">
-            <div class="filter-group">
-                <label for="roleFilter" class="sr-only">Filter by Role</label>
-                <select name="role_id" id="roleFilter" class="form-control form-control-sm">
-                    <option value="all">All Roles</option>
-                    @foreach($roles as $role)
-                        <option value="{{ $role->id }}" {{ request('role_id') == $role->id ? 'selected' : '' }}>
-                            {{ $role->role_name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="statusFilter" class="sr-only">Filter by Status</label>
-                <select name="status" id="statusFilter" class="form-control form-control-sm">
-                    <option value="all">All Statuses</option>
-                    <option value="present">Present</option>
-                    <option value="late">Late</option>
-                    <option value="absent">Absent</option>
-                </select>
-            </div>
-        </div>
     </div>
     
     <div class="card-body">

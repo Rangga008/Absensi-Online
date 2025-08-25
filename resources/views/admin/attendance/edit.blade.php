@@ -3,10 +3,31 @@
 @section('content')
 <!-- Page Heading -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <a href="{{ route('admin.attendances.index') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back</a>
+    <a href="{{ url('admin/users/' . $attendance->user_id . '/attendances') }}" class="btn btn-primary">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
     <h1 class="h3 text-gray-800">Edit Attendance</h1>
     <div></div> <!-- Spacer for alignment -->
 </div>
+
+<!-- Notifications -->
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle mr-2"></i> {{ session('error') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
 
 <!-- DataTales Example -->
 <div class="card shadow mb-4">
@@ -14,18 +35,31 @@
         <form action="{{ route('admin.attendances.update', $attendance->id) }}" method="POST">
             @method('PUT')
             @csrf
+            
+            <!-- Hidden input for user_id to ensure it's submitted -->
+            <input type="hidden" name="user_id" value="{{ $attendance->user_id }}">
+            
             <div class="row">
-                <!-- User Selection -->
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Employee *</label>
-                    <select name="user_id" class="form-control" required>
-                        @foreach($users as $user)
-                        <option value="{{ $user->id }}" {{ $attendance->user_id == $user->id ? 'selected' : '' }}>
-                            {{ $user->name }} ({{ $user->nip ?? 'N/A' }})
-                        </option>
-                        @endforeach
-                    </select>
+               <!-- User Selection (Read-only since we're editing existing attendance) -->
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Name *</label>
+                <div class="d-flex align-items-center p-2 border rounded bg-light">
+                    <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mr-3"
+                        style="width: 45px; height: 45px; font-size: 18px; font-weight: bold;">
+                        {{ substr($attendance->user->name, 0, 1) }}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold text-dark" style="font-size: 15px;">
+                            {{ $attendance->user->name }}
+                        </div>
+                        
+                    </div>
                 </div>
+                <small class="form-text text-muted d-block mt-1">
+                    Cannot change User for existing attendance record.
+                </small>
+            </div>
+
 
                 <!-- Date and Time -->
                 <div class="col-md-6 mb-3">
@@ -172,6 +206,11 @@ function getCurrentLocation() {
 document.addEventListener('DOMContentLoaded', function() {
     initMapPicker();
     
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function() {
+        $('.alert').fadeOut('slow');
+    }, 5000);
+    
     // Combine date and time fields into present_at before submission
     const form = document.querySelector('form');
     form.addEventListener('submit', function(e) {
@@ -179,7 +218,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const time = document.querySelector('input[name="present_time"]').value;
         
         // Create a hidden input for present_at
-        
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'present_at';
+        hiddenInput.value = date + ' ' + time + ':00';
         
         form.appendChild(hiddenInput);
     });
@@ -193,6 +235,19 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .leaflet-marker-draggable {
     cursor: move;
+}
+.avatar {
+    font-weight: bold;
+}
+.alert {
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+.alert-success {
+    border-left-color: #28a745;
+}
+.alert-danger {
+    border-left-color: #dc3545;
 }
 </style>
 @endsection

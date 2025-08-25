@@ -30,7 +30,6 @@
                             <th>Date</th>
                             <th>Time</th>
                             <th>Status</th>
-                            <th>Location</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -54,18 +53,7 @@
                                     {{ $attendance->description }}
                                 </span>
                             </td>
-                            <td>
-                                @if($attendance->latitude && $attendance->longitude)
-                                    <button class="btn btn-sm btn-info show-map" 
-                                            data-lat="{{ $attendance->latitude }}"
-                                            data-lng="{{ $attendance->longitude }}"
-                                            data-distance="{{ $attendance->distance }}">
-                                        <i class="fas fa-map-marked-alt"></i> Show Map
-                                    </button>
-                                @else
-                                    N/A
-                                @endif
-                            </td>
+                            
                             <td>
                                 <a href="{{ route('admin.attendances.edit', $attendance->id) }}" 
                                 class="btn btn-sm btn-primary">
@@ -74,7 +62,7 @@
                             
                                 <a href="{{ route('admin.attendances.show', $attendance->id) }}" 
                                 class="btn btn-sm btn-warning">
-                                    <i class="fas fa-edit"></i>
+                                    <i class="fas fa-eye"></i>
                                 </a>
                             </td>
                         </tr>

@@ -323,50 +323,64 @@ public function show($id)
     /**
      * Update attendance record
      */
-    public function update(Request $request, $id)
-    {
-        if (!session('is_admin')) {
-            return redirect()->route('admin.login');
+   public function update(Request $request, $id)
+{
+    if (!session('is_admin')) {
+        return redirect()->route('admin.login');
+    }
+
+    $validated = $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'present_date' => 'required|date',
+        'present_time' => 'required',
+        'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
+        'latitude' => 'nullable|numeric|between:-90,90',
+        'longitude' => 'nullable|numeric|between:-180,180',
+    ]);
+
+    try {
+        $attendance = Attendance::findOrFail($id);
+        
+        // Gabungkan date dan time menjadi datetime
+        $presentAt = Carbon::createFromFormat(
+            'Y-m-d H:i', 
+            $validated['present_date'] . ' ' . $validated['present_time']
+        );
+
+        // Hitung ulang distance berdasarkan koordinat baru
+        $distance = null;
+        if ($validated['latitude'] && $validated['longitude']) {
+            $distance = $this->calculateDistance(
+                $validated['latitude'],
+                $validated['longitude'],
+                -6.906000, // SMKN 2 Bandung latitude
+                107.623400 // SMKN 2 Bandung longitude
+            );
         }
 
-        $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'present_date' => 'required|date',
-            'present_time' => 'required',
-            'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+        $attendance->update([
+            'user_id' => $validated['user_id'],
+            'present_at' => $presentAt,
+            'present_date' => $validated['present_date'],
+            'description' => $validated['description'],
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'distance' => $distance, // Update distance yang baru
         ]);
 
-        try {
-            $attendance = Attendance::findOrFail($id);
+        // Kembali ke halaman edit dengan pesan sukses
+        return redirect()->route('admin.attendances.edit', $id)
+            ->with('success', 'Data absensi berhasil diperbarui!');
             
-            // Gabungkan date dan time menjadi datetime
-            $presentAt = Carbon::createFromFormat(
-                'Y-m-d H:i', 
-                $validated['present_date'] . ' ' . $validated['present_time']
-            );
-
-            $attendance->update([
-                'user_id' => $validated['user_id'],
-                'present_at' => $presentAt,
-                'present_date' => $validated['present_date'],
-                'description' => $validated['description'],
-                'latitude' => $validated['latitude'],
-                'longitude' => $validated['longitude'],
-            ]);
-
-            return redirect()->route('admin.attendances.index')
-                ->with('success', 'Absensi berhasil diperbarui');
-        } catch (\Exception $e) {
-            Log::error('Error updating attendance', [
-                'error' => $e->getMessage(), 
-                'id' => $id,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return back()->with('error', 'Gagal memperbarui absensi: ' . $e->getMessage())->withInput();
-        }
+    } catch (\Exception $e) {
+        Log::error('Error updating attendance', [
+            'error' => $e->getMessage(), 
+            'id' => $id,
+            'trace' => $e->getTraceAsString()
+        ]);
+        return back()->with('error', 'Gagal memperbarui absensi: ' . $e->getMessage())->withInput();
     }
+}
 
     /**
      * Delete attendance record

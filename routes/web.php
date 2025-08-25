@@ -27,12 +27,14 @@ Route::prefix('user')->middleware(['check.user.session'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('user.home');
     Route::get('/about', [HomeController::class, 'about'])->name('user.about');
     Route::get('/guide', [HomeController::class, 'guide'])->name('user.guide');
-    Route::match(['get', 'post'], '/concession', [HomeController::class, 'concession'])->name('user.concession');
-    Route::post('/store-concession', [HomeController::class, 'store_concession'])->name('user.store_concession');
     Route::get('/salary', [HomeController::class, 'show_salary'])->name('user.salary');
     Route::get('/history', [HomeController::class, 'show_history'])->name('user.history');
     Route::get('/attendance', [UserAttendanceController::class, 'index'])->name('user.attendance');
     Route::post('/do-attendance', [UserAttendanceController::class, 'store'])->name('user.do_attendance');
+    Route::get('/concession', [ConcessionController::class, 'createForUser'])->name('user.concession.create');
+    Route::post('/concession', [ConcessionController::class, 'storeForUser'])->name('user.concession.store');
+    Route::get('/concession/history', [ConcessionController::class, 'userHistory'])->name('user.concession.history');
+    
 });
 
 /** Route untuk backend admin */
@@ -52,6 +54,8 @@ Route::prefix('admin')->group(function () {
         ->name('admin.users.reset-password.form');
     Route::post('users/{user}/reset-password', [UserController::class, 'processResetPassword'])
         ->name('admin.users.reset-password');
+        Route::get('concessions/create', [ConcessionController::class, 'create'])
+         ->name('admin.concessions.create');
         
     // Resources
     Route::resource('users', UserController::class)->names([
@@ -100,7 +104,7 @@ Route::prefix('admin')->group(function () {
         ->name('admin.users.attendances');
     
     // Concessions
-    Route::resource('concessions', ConcessionController::class)->names([
+     Route::resource('concessions', ConcessionController::class)->names([
         'index' => 'admin.concessions.index',
         'create' => 'admin.concessions.create',
         'store' => 'admin.concessions.store',
@@ -109,7 +113,15 @@ Route::prefix('admin')->group(function () {
         'update' => 'admin.concessions.update',
         'destroy' => 'admin.concessions.destroy'
     ]);
+    
+    // Tambahkan routes untuk approve/reject
+    Route::post('concessions/{id}/approve', [ConcessionController::class, 'approve'])
+         ->name('admin.concessions.approve');
+    Route::post('concessions/{id}/reject', [ConcessionController::class, 'reject'])
+         ->name('admin.concessions.reject');
 });
+
+
 
 /** Route untuk AJAX requests */
 Route::prefix('api')->group(function () {
@@ -129,31 +141,6 @@ Route::get('/debug-session', function () {
         'is_admin' => session('is_admin'),
         'admin_id' => session('admin_id'),
     ];
-});
-
-// Add to routes/web.php
-Route::get('/test-photo', function() {
-    $path = 'attendance-photos/attendance_1755400464_1.jpg';
-    
-    // Method 1: Via Storage
-    if (!Storage::disk('public')->exists($path)) {
-        return response('File not found in storage', 404);
-    }
-
-    // Method 2: Direct filesystem check
-    $fullPath = storage_path('app/public/'.$path);
-    if (!file_exists($fullPath)) {
-        return response('File not found in filesystem', 404);
-    }
-
-    return response()->json([
-        'storage_url' => Storage::url($path),
-        'direct_url' => url('/storage/'.$path),
-        'filesystem_path' => $fullPath,
-        'mime_type' => Storage::disk('public')->mimeType($path),
-        'size' => Storage::disk('public')->size($path),
-        'modified' => date('Y-m-d H:i:s', Storage::disk('public')->lastModified($path))
-    ]);
 });
 
 Route::post('/attendance/check-status', [AttendanceController::class, 'checkAttendanceStatus'])

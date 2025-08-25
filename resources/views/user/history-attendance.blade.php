@@ -1,87 +1,255 @@
 @extends('user.layouts')
 
 @section('content')
-<div class="card p-3 shadow rounded">
-    <div class="welcome-message mb-4">
-        <h5>Hai <b>{{ ucfirst(session('username')) }}</b>, selamat datang di sistem absensi</h5>
-        <small class="text-muted">{{ \Carbon\Carbon::now()->isoFormat('dddd, D MMMM Y') }}</small>
-    </div>
-
-    <hr>
-
-    <div class="attendance-history">
-        <h5 class="mb-3"><i class="fas fa-history mr-2"></i>Riwayat 7 Hari Terakhir</h5>
-        
-        @if($histories->isEmpty())
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> Tidak ada riwayat dalam 7 hari terakhir
-            </div>
-        @else
-            <div class="list-group">
-                @foreach($histories as $history)
-                    <div class="list-group-item list-group-item-action flex-column align-items-start">
-                        <div class="d-flex w-100 justify-content-between">
-                            <div class="d-flex align-items-center">
-                                @if(in_array(strtolower($history->present_at), ['cuti', 'sakit', 'izin']))
-                                    <span class="status-icon text-danger mr-3"><i class="fas fa-times-circle fa-lg"></i></span>
-                                    <h6 class="mb-1">{{ ucfirst($history->present_at) }}</h6>
-                                @else
-                                    <span class="status-icon text-success mr-3"><i class="fas fa-check-circle fa-lg"></i></span>
-                                    <h6 class="mb-1">Hadir</h6>
-                                @endif
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-gradient-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history mr-2"></i>Riwayat 7 Hari Terakhir
+                        </h5>
+                        <span class="badge badge-light">
+                            <i class="fas fa-calendar-alt mr-1"></i>
+                            {{ \Carbon\Carbon::now()->isoFormat('D MMM YYYY') }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="welcome-section mb-4 p-3 bg-light rounded">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle bg-primary mr-3">
+                                <i class="fas fa-user text-white"></i>
                             </div>
-                            <small class="text-muted">
-                                {{ $history->created_at->isoFormat('dddd, D MMMM Y') }}
-                            </small>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-clock"></i> 
-                                {{ $history->created_at->format('H:i') }} WIB
-                            </small>
-                            @if($history->description)
-                                <div class="mt-1">
-                                    <small><strong>Keterangan:</strong> {{ $history->description }}</small>
-                                </div>
-                            @endif
+                            <div>
+                                <h6 class="mb-0 text-primary">Hai, <strong>{{ ucfirst(session('username')) }}</strong></h6>
+                                <small class="text-muted">Selamat datang di sistem absensi</small>
+                            </div>
                         </div>
                     </div>
-                @endforeach
-            </div>
-        @endif
-    </div>
 
-    <div class="mt-4">
-        <a href="{{ url('user/home') }}" class="btn btn-primary">
-            <i class="fas fa-arrow-left mr-2"></i> Kembali ke Beranda
-        </a>
+                    @if($histories->isEmpty())
+                        <div class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">Tidak ada riwayat</h5>
+                                <p class="text-muted">Tidak ada riwayat kehadiran dalam 7 hari terakhir</p>
+                            </div>
+                        </div>
+                    @else
+                        <div class="timeline">
+                            @foreach($histories as $history)
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">
+                                        @if($history->type === 'hadir')
+                                            <div class="timeline-icon bg-success">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        @else
+                                            {{-- Untuk izin --}}
+                                            @if(isset($history->status) && $history->status === 'approved')
+                                                <div class="timeline-icon bg-success">
+                                                    <i class="fas fa-check"></i>
+                                                </div>
+                                            @elseif(isset($history->status) && $history->status === 'rejected')
+                                                <div class="timeline-icon bg-danger">
+                                                    <i class="fas fa-times"></i>
+                                                </div>
+                                            @else
+                                                <div class="timeline-icon bg-warning">
+                                                    <i class="fas fa-clock"></i>
+                                                </div>
+                                            @endif
+                                        @endif
+                                    </div>
+                                    <div class="timeline-content card shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="mb-0 font-weight-bold">
+                                                    @if($history->type === 'hadir')
+                                                        Hadir
+                                                    @else
+                                                        {{ ucfirst($history->present_at) }}
+                                                    @endif
+                                                </h6>
+                                                <span class="badge badge-{{ 
+                                                    $history->type === 'hadir' ? 'success' : 
+                                                    (isset($history->status) && $history->status === 'approved' ? 'success' : 
+                                                    (isset($history->status) && $history->status === 'rejected' ? 'danger' : 'warning')) 
+                                                }}">
+                                                    @if($history->type === 'hadir')
+                                                        Hadir
+                                                    @else
+                                                        {{ isset($history->status) ? 
+                                                            ($history->status === 'approved' ? 'Disetujui' : 
+                                                            ($history->status === 'rejected' ? 'Ditolak' : 'Menunggu')) : 
+                                                            'Menunggu' 
+                                                        }}
+                                                    @endif
+                                                </span>
+                                            </div>
+                                            
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar-day mr-1"></i>
+                                                        {{ $history->created_at->isoFormat('dddd, D MMMM YYYY') }}
+                                                    </small>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        {{ $history->created_at->format('H:i') }} WIB
+                                                    </small>
+                                                </div>
+                                                <div class="text-right">
+                                                    @if($history->description)
+                                                        <button class="btn btn-sm btn-outline-primary" data-toggle="collapse" 
+                                                                data-target="#detail-{{ $history->id }}" aria-expanded="false">
+                                                            <i class="fas fa-info-circle"></i> Detail
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            
+                                            @if($history->description)
+                                                <div class="collapse mt-3" id="detail-{{ $history->id }}">
+                                                    <div class="detail-card p-3 bg-light rounded">
+                                                        <h6 class="text-primary mb-2">
+                                                            <i class="fas fa-sticky-note mr-1"></i>Keterangan
+                                                        </h6>
+                                                        <p class="mb-0 text-dark">{{ $history->description }}</p>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="mt-4 text-center">
+                        <a href="{{ url('user/home') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-left mr-2"></i> Kembali ke Beranda
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+@endsection
 
+@section('styles')
 <style>
-    .welcome-message {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%) !important;
     }
     
-    .attendance-history {
-        background-color: #fff;
-        border-radius: 8px;
+    .avatar-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
     }
     
-    .status-icon {
+    .welcome-section {
+        background-color: #f8f9fc !important;
+        border-left: 4px solid #4e73df;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 3rem;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #e3e6f0;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-marker {
+        position: absolute;
+        left: -3rem;
+        top: 0;
+        z-index: 2;
+    }
+    
+    .timeline-icon {
         width: 30px;
-        text-align: center;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.8rem;
+        box-shadow: 0 0 0 4px white, 0 2px 5px rgba(0,0,0,0.15);
     }
     
-    .list-group-item {
-        border-left: none;
-        border-right: none;
+    .timeline-content {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 0.5rem;
+        overflow: hidden;
     }
     
-    .list-group-item:first-child {
-        border-top: none;
+    .timeline-content:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+    }
+    
+    .detail-card {
+        border-left: 3px solid #4e73df;
+    }
+    
+    .empty-state {
+        opacity: 0.7;
+    }
+    
+    @media (max-width: 768px) {
+        .timeline {
+            padding-left: 2.5rem;
+        }
+        
+        .timeline-marker {
+            left: -2.5rem;
+        }
+        
+        .card-header h5 {
+            font-size: 1.1rem;
+        }
     }
 </style>
+@endsection
+
+@section('scripts')
+<script>
+    $(document).ready(function() {
+        // Animasi untuk timeline items
+        $('.timeline-item').each(function(i) {
+            $(this).delay(i * 200).animate({ opacity: 1 }, 400);
+        });
+        
+        // Tooltip untuk button detail
+        $('[data-toggle="collapse"]').tooltip({
+            title: "Klik untuk melihat detail",
+            placement: "top"
+        });
+    });
+</script>
 @endsection
