@@ -8,9 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description" content="">
     <meta name="author" content="">
-    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
+    <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
 
-    <title>Absensi SMKN 2 Bandung</title>
+
+
+    <title>{{ setting('app_name', 'Presensi Online') }} - @yield('title')</title>
 
     <!-- Custom fonts for this template-->
     <link href="{{ asset('sbadmin') }}/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
@@ -29,6 +31,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 </head>
 
@@ -134,7 +141,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>Copyright &copy; Your Website 2021</span>
+                        <span>Copyright &copy; {{ setting('company_name', 'SMKN 2 Bandung') }} {{ date('Y') }}</span>
                     </div>
                 </div>
             </footer>
@@ -189,6 +196,73 @@
     <!-- Page level custom scripts -->
     <script src="{{ asset('sbadmin') }}/js/demo/chart-area-demo.js"></script>
     <script src="{{ asset('sbadmin') }}/js/demo/chart-pie-demo.js"></script>
+
+    <!-- Force favicon refresh -->
+    <script>
+        // Force favicon refresh to bypass browser cache
+        document.addEventListener('DOMContentLoaded', function() {
+    function updateFavicon() {
+        try {
+            const favicon = document.getElementById('favicon');
+            const shortcutIcon = document.querySelector('link[rel="shortcut icon"]');
+            const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+            
+            // Get fresh logo URL with timestamp
+            const logoUrl = '{{ app_logo() }}';
+            const freshUrl = logoUrl.split('?')[0] + '?v=' + Date.now();
+            
+            // Update all favicon related links
+            if (favicon) favicon.href = freshUrl;
+            if (shortcutIcon) shortcutIcon.href = freshUrl;
+            if (appleIcon) appleIcon.href = freshUrl;
+            
+            console.log('Favicon updated to:', freshUrl);
+            
+        } catch (error) {
+            console.error('Error updating favicon:', error);
+        }
+    }
+    
+    // Initial favicon update
+    updateFavicon();
+    
+    // Update favicon when page becomes visible (handles cache issues)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            setTimeout(updateFavicon, 500);
+        }
+    });
+    
+    // Update favicon when window gains focus
+    window.addEventListener('focus', function() {
+        setTimeout(updateFavicon, 500);
+    });
+    
+    // Listen for storage events (if logo updated in another tab)
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'logoUpdated') {
+            setTimeout(updateFavicon, 1000);
+        }
+    });
+});
+
+// Function to force favicon refresh (can be called from other pages)
+function refreshFavicon() {
+    const timestamp = Date.now();
+    document.getElementById('favicon').href = '{{ app_logo() }}&refresh=' + timestamp;
+    
+    // Signal other tabs that logo was updated
+    try {
+        localStorage.setItem('logoUpdated', timestamp.toString());
+        localStorage.removeItem('logoUpdated'); // Trigger storage event
+    } catch (e) {
+        console.warn('localStorage not available for cross-tab communication');
+    }
+}
+
+// Make function globally available
+window.refreshFavicon = refreshFavicon;
+    </script>
 
     
 

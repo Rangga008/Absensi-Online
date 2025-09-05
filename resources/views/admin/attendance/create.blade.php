@@ -56,7 +56,7 @@
                     <label class="form-label">Latitude</label>
                     <div class="input-group">
                         <input type="text" class="form-control" name="latitude" id="latitude" 
-                               value="{{ old('latitude', '-6.906000') }}" placeholder="e.g., -6.906000">
+                               value="{{ old('latitude', setting('office_lat', -6.906000)) }}" placeholder="e.g., -6.906000">
                         <button type="button" class="btn btn-outline-primary" onclick="getCurrentLocation()">
                             <i class="fas fa-location-arrow"></i> Current
                         </button>
@@ -67,7 +67,7 @@
                     <label class="form-label">Longitude</label>
                     <div class="input-group">
                         <input type="text" class="form-control" name="longitude" id="longitude" 
-                               value="{{ old('longitude', '107.623400') }}" placeholder="e.g., 107.623400">
+                               value="{{ old('longitude', setting('office_lng', 107.623400)) }}" placeholder="e.g., 107.623400">
                         <button type="button" class="btn btn-outline-primary" onclick="getCurrentLocation()">
                             <i class="fas fa-location-arrow"></i> Current
                         </button>
@@ -104,9 +104,14 @@ let marker;
 let circle;
 
 function initMapPicker() {
-    // Default coordinates (school location)
-    const defaultLat = parseFloat(document.getElementById('latitude').value) || -6.906000;
-    const defaultLng = parseFloat(document.getElementById('longitude').value) || 107.623400;
+    // Get office coordinates from settings
+    const officeLat = {{ setting('office_lat', -6.906000) }};
+    const officeLng = {{ setting('office_lng', 107.623400) }};
+    const maxDistance = {{ setting('max_distance', 500) }};
+    
+    // Default coordinates (office location)
+    const defaultLat = parseFloat(document.getElementById('latitude').value) || officeLat;
+    const defaultLng = parseFloat(document.getElementById('longitude').value) || officeLng;
     
     map = L.map('mapPicker').setView([defaultLat, defaultLng], 15);
     
@@ -119,13 +124,13 @@ function initMapPicker() {
         draggable: true
     }).addTo(map);
     
-    // Add circle for valid radius
-    circle = L.circle([-6.906000, 107.623400], {
+    // Add circle for valid radius using configured max distance
+    circle = L.circle([officeLat, officeLng], {
         color: 'blue',
         fillColor: '#0066cc',
         fillOpacity: 0.1,
-        radius: 500
-    }).addTo(map).bindPopup('Valid Attendance Radius (500m)');
+        radius: maxDistance
+    }).addTo(map).bindPopup(`Valid Attendance Radius (${maxDistance}m)`);
 
     // Update form fields when marker is moved
     marker.on('dragend', function(e) {
@@ -158,7 +163,7 @@ function getCurrentLocation() {
                 map.setView([lat, lng], 15);
             },
             function(error) {
-                alert('Error getting location: ' + error.message);
+                alert('Error getting location: ' . error.message);
             }
         );
     } else {
@@ -177,7 +182,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const time = document.querySelector('input[name="present_time"]').value;
         
         // Create a hidden input for present_at
-        
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'present_at';
+        hiddenInput.value = date + ' ' + time + ':00';
         
         form.appendChild(hiddenInput);
     });

@@ -10,9 +10,9 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <link rel="stylesheet" href="main.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
+    <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
 
-    <title>Aplikasi Absensi Berbasis Lokasi</title>
+    <title>{{ setting('app_name', 'Presensi Online') }} - @yield('title')</title>
 </head>
 
 <body>
@@ -47,8 +47,8 @@
         <div class="content mt-1 col-md-1 offset-md-1">
 
             <div class="mb-3">
-                <h2>Sistem Presensi Online</h2>
-                <small>SMKN 2 Bandung</small>
+                <h2>{{ strtoupper(setting('app_name', 'Absensi Online')) }}</h2>
+                <small>{{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}</small>
             </div>
             <div class="alert alert-danger">Email dan password belum terdaftar</div>
             <form class="mt-4" action="home.html">

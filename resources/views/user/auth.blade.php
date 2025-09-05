@@ -119,9 +119,9 @@
                     
                     <!-- Header Section -->
                     <div class="text-center mb-4">
-                        <img src="{{ asset('images/logo-smk2.png') }}" alt="Logo SMKN 2 Bandung" class="school-logo">
-                        <h3 class="fw-bold text-dark mb-1">Sistem Absensi Digital</h3>
-                        <h4 class="h5 text-success mb-3">SMK NEGERI 2 BANDUNG</h4>
+                        <img src="{{ app_logo() }}" alt="Logo {{ setting('company_name', 'SMKN 2 Bandung') }}" class="school-logo"> 
+                        <h3 class="fw-bold text-dark mb-1">{{ strtoupper(setting('app_name', 'SMK NEGERI 2 BANDUNG')) }}</h3>
+                        <h4 class="h5 text-success mb-3">{{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}</h4>
                         
                         <!-- Live Clock -->
                         <div class="mb-3">
@@ -176,7 +176,6 @@
                     <div class="text-center mt-4">
                         <p class="text-muted mb-1">
                             <i class="fas fa-map-marker-alt me-2"></i>
-                            Jl. Ciliwung No.4, Cihapit, Bandung
                         </p>
                     </div>
                 </div>
@@ -184,7 +183,7 @@
                 <!-- Footer -->
                 <div class="text-center mt-3 footer">
                     <p class="mb-0">
-                        &copy; {{ date('Y') }} SMKN 2 Bandung. All rights reserved.
+                        &copy; {{ date('Y') }} {{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}. All rights reserved.
                     </p>
                     <small>
                         Developed with <i class="fas fa-heart text-danger"></i> for better education

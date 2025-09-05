@@ -3,8 +3,14 @@
 
     <!-- Sidebar - Brand -->
     <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('admin.dashboard') }}">
-        <div class="sidebar-brand-text mx-3">Presensi Online <small> SMKN 2 Bandung </small></div><br>
+        
+        <div class="sidebar-brand-text mx-3">
+        {{ setting('app_name', 'Presensi Online') }}
+        <small>
+            <br>{{ setting('company_name', 'SMKN 2 Bandung') }}</small>
+    </div>
     </a>
+
 
     <!-- Divider -->
     <hr class="sidebar-divider my-0">
@@ -50,6 +56,13 @@
         <a class="nav-link" href="{{ route('admin.concessions.index') }}">
             <i class="fas fa-fw fa-edit"></i>
             <span>Concession</span></a>
+    </li>
+
+    <!-- Nav Item - Settings -->
+    <li class="nav-item {{ request()->is('admin/settings*') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('admin.settings.index') }}">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Settings</span></a>
     </li>
 
     @endif

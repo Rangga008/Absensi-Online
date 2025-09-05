@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
+    <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
 
     <!-- Fonts and icons -->
     <link href="{{ asset('sbadmin') }}/vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
@@ -109,8 +109,8 @@
                                     <h2 class="h1 font-weight-bold mb-3">
                                    {{ ucfirst(session('username')) }}
                                     </h2>
-                                    <p class="mb-1">Sistem absensi SMKN 2 Bandung</p>
-                                    <p class="mb-0">{{ now()->translatedFormat('l, d F Y') }}</p>
+                                    <p class="mb-1">{{ strtoupper(setting('app_name', 'SMK NEGERI 2 BANDUNG')) }}</p>
+                                    <p class="mb-0">{{ now()->locale('id')->translatedFormat('l, d F Y') }}</p>
                                 </div>
                                 @auth
                                 <div class="col-md-4 text-right">
@@ -135,7 +135,7 @@
     <footer class="mt-auto">
         <div class="container">
             <div class="text-center text-muted">
-                Copyright &copy; {{ date('Y') }} SMKN 2 Bandung
+                Copyright &copy; {{ date('Y') }} {{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}
             </div>
         </div>
     </footer>

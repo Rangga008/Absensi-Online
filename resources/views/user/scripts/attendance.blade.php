@@ -1,12 +1,16 @@
 <script>
 // Constants
-const OFFICE_LAT = -6.906000000000;
-const OFFICE_LNG = 107.623400000000;
-const MAX_DISTANCE = 50000; // 50km maximum distance in meters
+const OFFICE_LAT = {{ setting('office_lat', -6.906000) }};
+const OFFICE_LNG = {{ setting('office_lng', 107.623400) }};
+const MAX_DISTANCE = {{ setting('max_distance', 50000) }}; // Get from settings
 const MIN_ACCURACY = 100; // Minimum acceptable accuracy in meters
 const DEBOUNCE_TIME = 500; // Debounce time in ms
 const LOCATION_REFRESH_INTERVAL = 30000; // 30 seconds
 const ATTENDANCE_CHECK_INTERVAL = 15000; // 15 seconds
+
+const WORK_START_TIME = '{{ setting("work_start_time", "07:00") }}';
+const WORK_END_TIME = '{{ setting("work_end_time", "16:00") }}';
+const LATE_THRESHOLD = '{{ setting("late_threshold", "08:00") }}';
 
 // Camera variables
 let stream = null;
@@ -24,36 +28,35 @@ let attendanceProcessed = false;
 let debounceTimer = null;
 
 // Initialize map
-function initMap() {
-    map = L.map('map').setView([OFFICE_LAT, OFFICE_LNG], 15);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    function initMap() {
+        map = L.map('map').setView([OFFICE_LAT, OFFICE_LNG], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
-    // School marker
-    const schoolIcon = L.divIcon({
-        html: '<i class="fas fa-school" style="color: #e63946; font-size: 24px;"></i>',
-        iconSize: [24, 24],
-        className: 'custom-div-icon'
-    });
-    
-    officeMarker = L.marker([OFFICE_LAT, OFFICE_LNG], {icon: schoolIcon})
-        .addTo(map)
-        .bindPopup(`
-            <b>SMKN 2 Bandung</b><br>
-            <small>Jl. Ciliwung No.4, Cihapit</small><br>
-            <small>Kota Bandung, Jawa Barat</small>
-        `);
+        // School marker
+        const schoolIcon = L.divIcon({
+            html: '<i class="fas fa-school" style="color: #e63946; font-size: 24px;"></i>',
+            iconSize: [24, 24],
+            className: 'custom-div-icon'
+        });
+        
+        officeMarker = L.marker([OFFICE_LAT, OFFICE_LNG], {icon: schoolIcon})
+            .addTo(map)
+            .bindPopup(`
+               <b>{{ setting('company_name', 'SMKN 2 Bandung') }}</b><br>
+               <small>Kantor/Sekolah</small><br>
+            `);
 
-    // Add radius circle for attendance area
-    L.circle([OFFICE_LAT, OFFICE_LNG], {
-        color: 'blue',
-        fillColor: '#0066cc',
-        fillOpacity: 0.1,
-        radius: MAX_DISTANCE
-    }).addTo(map).bindPopup('Area Absensi (Radius ' + MAX_DISTANCE + ' meter)');
-}
+        // Add radius circle for attendance area
+        L.circle([OFFICE_LAT, OFFICE_LNG], {
+            color: 'blue',
+            fillColor: '#0066cc',
+            fillOpacity: 0.1,
+            radius: MAX_DISTANCE
+        }).addTo(map).bindPopup('Area Absensi (Radius ' + MAX_DISTANCE + ' meter)');
+    }
 
 // Camera Functions
 async function startCamera() {

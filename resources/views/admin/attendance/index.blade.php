@@ -1,5 +1,7 @@
 @extends('layouts.admin')
 
+@section('title', 'Attendance Management')
+
 @section('styles')
 <style>
 .filter-section {

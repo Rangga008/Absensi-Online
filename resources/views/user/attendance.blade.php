@@ -70,7 +70,7 @@
 
     <!-- Location Info -->
     <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card">
                 <div class="card-body">
                     <h6 class="card-title"><i class="fas fa-crosshairs"></i> Koordinat</h6>
@@ -82,19 +82,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title"><i class="fas fa-school"></i> Lokasi Sekolah</h6>
-                    <p class="card-text">
-                        <span class="badge badge-info">SMKN 2 Bandung</span><br>
-                        <small class="text-muted">Jl. Ciliwung No.4, Bandung</small><br>
-                        <small class="text-muted">Jarak: <span id="distance">-</span> meter</small><br>
-                        <small class="text-muted">Status: <span id="location-validation" class="badge">Checking...</span></small>
-                    </p>
-                </div>
-            </div>
-        </div>
+       
     </div>
 
     <!-- Attendance Form -->

@@ -1,8 +1,8 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center" href="{{ url('/') }}">
-            <img src="{{ asset('images/logo-smk2.png') }}" alt="Logo" width="30" height="30" class="mr-2">
-            <span class="font-weight-bold">Presensi Online</span>
+            <img src="{{ app_logo() }}" alt="Logo" width="30" height="30" class="mr-2">
+            <span class="font-weight-light">{{ strtoupper(setting('app_name', 'SMK NEGERI 2 BANDUNG')) }}</span>
         </a>
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent" 
                 aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,9 +38,7 @@
                         </button>
                     </form>
                 @else
-                    <a href="{{ route('login') }}" class="btn btn-light btn-sm">
-                        <i class="fas fa-sign-in-alt mr-1"></i> Login
-                    </a>
+
                 @endauth
             </div>
         </div>

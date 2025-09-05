@@ -11,6 +11,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\ConcessionController;
+use App\Http\Controllers\SettingController;
 
 /** Route untuk halaman welcome/landing page */
 Route::get('/', function () {
@@ -38,7 +39,7 @@ Route::prefix('user')->middleware(['check.user.session'])->group(function () {
 });
 
 /** Route untuk backend admin */
-Route::prefix('admin')->group(function () {
+Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
     // Authentication
     Route::get('/login', [AdminAuthController::class, 'index'])->name('admin.login');
     Route::post('/login', [AdminAuthController::class, 'doLogin'])->name('admin.login.process');
@@ -48,6 +49,8 @@ Route::prefix('admin')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/settings', [SettingController::class, 'index'])->name('admin.settings.index');
+    Route::post('/update', [SettingController::class, 'update'])->name('admin.settings.update');
 
     // Password Reset
     Route::get('users/{user}/reset-password', [UserController::class, 'showResetPasswordForm'])
@@ -125,12 +128,20 @@ Route::prefix('admin')->group(function () {
 
 /** Route untuk AJAX requests */
 Route::prefix('api')->group(function () {
-    Route::post('/attendance/check-status', [UserAttendanceController::class, 'checkAttendanceStatus'])
-        ->name('attendance.check-status');
+
     Route::get('/attendance/stats', [UserAttendanceController::class, 'getStats'])
         ->name('attendance.stats');
     Route::post('/attendance', [UserAttendanceController::class, 'store'])
         ->name('attendance.store');
+});
+
+// Route untuk mendapatkan pengaturan absensi
+Route::get('/api/attendance-settings', function() {
+    return response()->json([
+        'office_lat' => Setting::getValue('office_lat', -6.906000000000),
+        'office_lng' => Setting::getValue('office_lng', 107.623400000000),
+        'max_distance' => Setting::getValue('max_distance', 50000),
+    ]);
 });
 
 // Debug route

@@ -3,8 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Selamat Datang - Aplikasi Absen SMKN 2 Bandung</title>
-    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
+    <title>Selamat Datang - {{ setting('app_name', 'Aplikasi Absen') }}</title>
+    <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
+    <link rel="shortcut icon" href="{{ app_logo() }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ app_logo() }}">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -430,18 +432,19 @@
                 <div class="col-12 col-lg-11 col-xl-10">
                     <div class="hero-card">
                         <div class="hero-content">
-                            <!-- Header Section -->
+                            <!-- Header Section with Dynamic Content -->
                             <div class="text-center">
-                                <img src="{{ asset('images/logo-smk2.png') }}" alt="Logo SMKN 2 Bandung" class="school-logo">
+                                <!-- Use app_logo() instead of hardcoded path -->
+                                <img src="{{ app_logo() }}" alt="Logo {{ setting('company_name', 'SMKN 2 Bandung') }}" class="school-logo">
                                 <h1 class="hero-title">Selamat Datang</h1>
                                 <h2 class="hero-subtitle">Sistem Absensi Digital</h2>
-                                <h3 class="hero-school">SMK NEGERI 2 BANDUNG</h3>
+                                <!-- Use dynamic company name -->
+                                <h3 class="hero-school">{{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}</h3>
                                 <p class="hero-location">
                                     <i class="fas fa-map-marker-alt location-icon"></i>
-                                    Jl. Ciliwung No.4, Cihapit, Bandung
                                 </p>
                                 
-                                <!-- Live Clock -->
+                                <!-- Live Clock with Dynamic Timezone -->
                                 <div class="time-display">
                                     <div class="clock" id="clock"></div>
                                     <div class="date" id="date"></div>
@@ -489,10 +492,10 @@
                                 </div>
                             </div>
                             
-                            <!-- Footer -->
+                            <!-- Footer with Dynamic Company Name -->
                             <div class="footer">
                                 <p class="footer-text">
-                                    &copy; {{ date('Y') }} SMKN 2 Bandung. All rights reserved.
+                                    &copy; {{ date('Y') }} {{ setting('company_name', 'SMKN 2 Bandung') }}. All rights reserved.
                                 </p>
                                 <small class="footer-love">
                                     Developed with <i class="fas fa-heart heart-icon"></i> for better education
@@ -508,26 +511,31 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Live Clock Script -->
+    <!-- Live Clock Script with Dynamic Timezone -->
     <script>
+        // Get timezone from settings (default to Asia/Jakarta)
+        const appTimezone = '{{ setting("timezone", "Asia/Jakarta") }}';
+        
         function updateTime() {
             const now = new Date();
             
-            // Format time
+            // Format time with timezone
             const timeOptions = {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
-                hour12: false
+                hour12: false,
+                timeZone: appTimezone
             };
             const timeString = now.toLocaleTimeString('id-ID', timeOptions);
             
-            // Format date
+            // Format date with timezone
             const dateOptions = {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
-                day: 'numeric'
+                day: 'numeric',
+                timeZone: appTimezone
             };
             const dateString = now.toLocaleDateString('id-ID', dateOptions);
             
@@ -539,7 +547,47 @@
         updateTime();
         setInterval(updateTime, 1000);
         
-        // Add smooth scroll behavior for better UX
+        // Enhanced favicon refresh system
+        document.addEventListener('DOMContentLoaded', function() {
+            function updateFavicon() {
+                try {
+                    const favicon = document.getElementById('favicon');
+                    const shortcutIcon = document.querySelector('link[rel="shortcut icon"]');
+                    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+                    
+                    // Get fresh logo URL with timestamp
+                    const logoUrl = '{{ app_logo() }}';
+                    const freshUrl = logoUrl.split('?')[0] + '?v=' + Date.now();
+                    
+                    // Update all favicon related links
+                    if (favicon) favicon.href = freshUrl;
+                    if (shortcutIcon) shortcutIcon.href = freshUrl;
+                    if (appleIcon) appleIcon.href = freshUrl;
+                    
+                } catch (error) {
+                    console.error('Error updating favicon:', error);
+                }
+            }
+            
+            // Initial favicon update
+            updateFavicon();
+            
+            // Update favicon when page becomes visible
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    setTimeout(updateFavicon, 500);
+                }
+            });
+            
+            // Listen for storage events (if logo updated in another tab)
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'logoUpdated') {
+                    setTimeout(updateFavicon, 1000);
+                }
+            });
+        });
+        
+        // Add smooth scroll behavior
         document.documentElement.style.scrollBehavior = 'smooth';
     </script>
 </body>

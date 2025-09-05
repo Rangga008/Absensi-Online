@@ -15,16 +15,6 @@ use Illuminate\Support\Collection;
 
 class AttendanceController extends Controller
 {
-    // School coordinates (SMKN 2 Bandung)
-    const SCHOOL_LATITUDE = -6.906000000000;
-    const SCHOOL_LONGITUDE = 107.623400000000;
-    const MAX_ALLOWED_DISTANCE = 50000; // 50km in meters
-    
-    // Work hours configuration (WIB timezone)
-    const WORK_START_HOUR = 7;
-    const WORK_END_HOUR = 17;
-    const LATE_THRESHOLD_HOUR = 8;
-
     /**
      * Show attendance page
      */
@@ -40,92 +30,103 @@ class AttendanceController extends Controller
     {
         // Add detailed logging
         Log::info('Attendance submission attempt', [
-            'data' => $request->except('photo'), // Don't log photo data
+            'user_id' => $request->get('user_id'),
+            'description' => $request->get('description'),
+            'has_photo' => !empty($request->get('photo')),
+            'latitude' => $request->get('latitude'),
+            'longitude' => $request->get('longitude'),
             'headers' => $request->headers->all()
         ]);
         
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
             'description' => 'required|in:Hadir,Terlambat,Sakit,Izin,Dinas Luar,WFH',
             'photo' => 'required|string',
         ]);
 
+        DB::beginTransaction();
+
         try {
+            // Get settings from database
+            $officeLat = (float) setting('office_lat', -6.906000);
+            $officeLng = (float) setting('office_lng', 107.623400);
+            $maxDistance = (int) setting('max_distance', 500);
+            $companyName = setting('company_name', 'sekolah');
+            $timezone = setting('timezone', 'Asia/Jakarta');
+            $workStartTime = setting('work_start_time', '07:00');
+            $workEndTime = setting('work_end_time', '16:00');
+            $lateThreshold = setting('late_threshold', '07:15');
+
             // Check for duplicate attendance first
-            $this->checkDuplicateAttendance($validated['user_id']);
+            $this->checkDuplicateAttendance($validated['user_id'], $timezone);
 
             // Process photo
             $photoPath = null;
-            if ($validated['photo']) {
-                $imageData = $validated['photo'];
-                
-                // Remove data URL prefix
-                if (strpos($imageData, 'data:image') === 0) {
-                    $imageData = preg_replace('#^data:image/\w+;base64,#i', '', $imageData);
-                }
-                
-                $imageData = str_replace(' ', '+', $imageData);
-                $decodedImage = base64_decode($imageData);
-                
-                // Validate image
-                if (!$decodedImage || !@imagecreatefromstring($decodedImage)) {
-                    throw new \Exception('Invalid image data');
-                }
-                
-                $imageName = 'attendance_'.time().'_'.$validated['user_id'].'.jpg';
-                $storagePath = 'attendance-photos/'.$imageName;
-                
-                // Store the image
-                Storage::disk('public')->put($storagePath, $decodedImage);
-                
-                if (!Storage::disk('public')->exists($storagePath)) {
-                    throw new \Exception('Failed to store image');
-                }
-                
-                $photoPath = $storagePath;
+            if (!empty($validated['photo'])) {
+                $photoPath = $this->processPhoto($validated['photo'], $validated['user_id']);
             }
 
             // Calculate distance
             $distance = $this->calculateDistance(
                 $validated['latitude'],
                 $validated['longitude'],
-                self::SCHOOL_LATITUDE,
-                self::SCHOOL_LONGITUDE
+                $officeLat,
+                $officeLng
             );
 
-            // Create attendance record dengan semua field yang diperlukan
+            // Validate location for certain statuses
+            $this->validateLocation($validated['description'], $distance, $maxDistance, $companyName);
+
+            // Determine final status based on time
+            $currentTime = now($timezone);
+            $finalStatus = $this->determineAttendanceStatus(
+                $validated['description'], 
+                $currentTime,
+                $workStartTime,
+                $lateThreshold,
+                $workEndTime
+            );
+
+            // Create attendance record
             $attendance = Attendance::create([
                 'user_id' => $validated['user_id'],
-                'description' => $validated['description'],
+                'description' => $finalStatus,
                 'latitude' => $validated['latitude'],
                 'longitude' => $validated['longitude'],
                 'photo_path' => $photoPath,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'distance' => $distance,
-                'present_date' => now('Asia/Jakarta')->format('Y-m-d'),
-                'present_at' => now('Asia/Jakarta'),
+                'present_date' => $currentTime->format('Y-m-d'),
+                'present_at' => $currentTime,
             ]);
+
+            DB::commit();
 
             Log::info('Attendance created successfully', [
                 'attendance_id' => $attendance->id,
-                'user_id' => $validated['user_id']
+                'user_id' => $validated['user_id'],
+                'final_status' => $finalStatus,
+                'distance' => $distance
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Absensi berhasil dicatat',
+                'message' => 'Absensi berhasil dicatat dengan status: ' . $finalStatus,
                 'data' => [
                     'time' => $attendance->present_at->format('H:i:s'),
                     'date' => $attendance->present_date,
                     'distance' => round($distance),
+                    'status' => $finalStatus,
                     'photo_url' => $photoPath ? asset('storage/'.$photoPath) : null
                 ]
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            
             Log::error('Attendance error: '.$e->getMessage(), [
                 'user_id' => $validated['user_id'] ?? null,
                 'trace' => $e->getTraceAsString()
@@ -133,8 +134,66 @@ class AttendanceController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => 'Error: '.$e->getMessage()
-            ], 500);
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
+    /**
+     * Process and store photo
+     */
+    private function processPhoto($photoData, $userId)
+    {
+        try {
+            // Remove data URL prefix if exists
+            if (strpos($photoData, 'data:image') === 0) {
+                $photoData = preg_replace('#^data:image/\w+;base64,#i', '', $photoData);
+            }
+            
+            $photoData = str_replace(' ', '+', $photoData);
+            $decodedImage = base64_decode($photoData);
+            
+            // Validate image
+            if (!$decodedImage) {
+                throw new \Exception('Invalid base64 image data');
+            }
+            
+            // Test if it's a valid image
+            $imageInfo = @getimagesizefromstring($decodedImage);
+            if (!$imageInfo) {
+                throw new \Exception('Invalid image format');
+            }
+            
+            // Generate unique filename
+            $imageName = 'attendance_'.time().'_'.$userId.'.jpg';
+            $storagePath = 'attendance-photos/'.$imageName;
+            
+            // Store the image
+            $stored = Storage::disk('public')->put($storagePath, $decodedImage);
+            
+            if (!$stored) {
+                throw new \Exception('Failed to store image');
+            }
+            
+            // Verify the file was actually created
+            if (!Storage::disk('public')->exists($storagePath)) {
+                throw new \Exception('Image file not found after storage');
+            }
+            
+            Log::info('Photo processed successfully', [
+                'path' => $storagePath,
+                'size' => strlen($decodedImage),
+                'user_id' => $userId
+            ]);
+            
+            return $storagePath;
+            
+        } catch (\Exception $e) {
+            Log::error('Photo processing failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId
+            ]);
+            throw new \Exception('Gagal memproses foto: ' . $e->getMessage());
         }
     }
 
@@ -145,7 +204,9 @@ class AttendanceController extends Controller
     {
         $request->validate(['user_id' => 'required|exists:users,id']);
         
-        $today = now('Asia/Jakarta')->format('Y-m-d');
+        $timezone = setting('timezone', 'Asia/Jakarta');
+        $today = now($timezone)->format('Y-m-d');
+        
         $attendance = Attendance::where('user_id', $request->user_id)
             ->whereDate('present_date', $today)
             ->first();
@@ -153,7 +214,7 @@ class AttendanceController extends Controller
         return response()->json([
             'can_attend' => is_null($attendance),
             'attendance' => $attendance ? $this->formatAttendanceData($attendance) : null,
-            'server_time' => $this->currentServerTime(),
+            'server_time' => $this->currentServerTime($timezone),
             'force_check' => true
         ]);
     }
@@ -169,8 +230,9 @@ class AttendanceController extends Controller
             'year' => 'nullable|integer|min:2000'
         ]);
 
-        $month = $request->month ?? now('Asia/Jakarta')->month;
-        $year = $request->year ?? now('Asia/Jakarta')->year;
+        $timezone = setting('timezone', 'Asia/Jakarta');
+        $month = $request->month ?? now($timezone)->month;
+        $year = $request->year ?? now($timezone)->year;
 
         $attendances = Attendance::where('user_id', $request->user_id)
             ->whereMonth('present_date', $month)
@@ -192,50 +254,58 @@ class AttendanceController extends Controller
                 'absent' => $workingDays - $attendanceCount,
                 'attendance_rate' => $workingDays > 0 ? round(($attendanceCount / $workingDays) * 100, 2) : 0,
             ],
-            'server_time' => $this->currentServerTime()
+            'server_time' => $this->currentServerTime($timezone)
         ]);
     }
 
     /**
      * Check for duplicate attendance
      */
-    private function checkDuplicateAttendance($userId)
+    private function checkDuplicateAttendance($userId, $timezone)
     {
-        $today = now('Asia/Jakarta')->format('Y-m-d');
+        $today = now($timezone)->format('Y-m-d');
         $existing = Attendance::where('user_id', $userId)
             ->whereDate('present_date', $today)
             ->first();
 
         if ($existing) {
-            throw new \Exception('Anda sudah melakukan absensi hari ini');
+            throw new \Exception('Anda sudah melakukan absensi hari ini pada pukul ' . 
+                                $existing->present_at->format('H:i:s') . 
+                                ' dengan status: ' . $existing->description);
         }
     }
 
     /**
      * Determine attendance status based on time
      */
-    private function determineAttendanceStatus($requestedStatus, Carbon $time)
+    private function determineAttendanceStatus($requestedStatus, Carbon $time, $workStartTime, $lateThreshold, $workEndTime)
     {
         // If status is not "Hadir", return as-is
         if ($requestedStatus !== 'Hadir') {
             return $requestedStatus;
         }
 
-        $workStart = $time->copy()->setTime(self::WORK_START_HOUR, 0, 0);
-        $lateThreshold = $time->copy()->setTime(self::LATE_THRESHOLD_HOUR, 0, 0);
+        // Parse time strings to Carbon objects
+        $workStart = Carbon::createFromFormat('H:i', $workStartTime, $time->timezone);
+        $lateThresholdTime = Carbon::createFromFormat('H:i', $lateThreshold, $time->timezone);
+        $workEnd = Carbon::createFromFormat('H:i', $workEndTime, $time->timezone);
         
-        // If before work start time, mark as invalid (too early)
+        // If before work start time, still allow but mark as early
         if ($time->lt($workStart)) {
-            throw new \Exception('Absensi terlalu awal. Jam kerja dimulai pukul '.self::WORK_START_HOUR.':00');
+            Log::info('Early attendance detected', [
+                'time' => $time->format('H:i:s'),
+                'work_start' => $workStart->format('H:i:s')
+            ]);
+            return 'Hadir'; // Still count as present
         }
         
-        // If after work end time, mark as invalid (too late)
-        if ($time->gt($time->copy()->setTime(self::WORK_END_HOUR, 0, 0))) {
-            throw new \Exception('Absensi terlalu lambat. Jam kerja berakhir pukul '.self::WORK_END_HOUR.':00');
+        // If after work end time, mark as late attendance
+        if ($time->gt($workEnd)) {
+            return 'Terlambat';
         }
         
         // If between work start and late threshold, mark as present
-        if ($time->lte($lateThreshold)) {
+        if ($time->lte($lateThresholdTime)) {
             return 'Hadir';
         }
         
@@ -246,34 +316,22 @@ class AttendanceController extends Controller
     /**
      * Validate attendance location
      */
-    private function validateAttendanceLocation(string $status, ?float $latitude, ?float $longitude): ?float
+    private function validateLocation(string $status, float $distance, int $maxDistance, string $companyName): void
     {
-        $exemptStatuses = ['WFH', 'Sakit', 'Izin'];
+        $exemptStatuses = ['WFH', 'Sakit', 'Izin', 'Dinas Luar'];
         
         if (in_array($status, $exemptStatuses)) {
-            return null;
+            return; // No location validation needed
         }
 
-        if (is_null($latitude) || is_null($longitude)) {
-            throw new \Exception('Lokasi tidak terdeteksi');
-        }
-
-        $distance = $this->calculateDistance(
-            $latitude,
-            $longitude,
-            self::SCHOOL_LATITUDE,
-            self::SCHOOL_LONGITUDE
-        );
-
-        if ($distance > self::MAX_ALLOWED_DISTANCE) {
+        if ($distance > $maxDistance) {
             throw new \Exception(sprintf(
-                'Jarak Anda %dm dari sekolah (maksimal %dm)',
-                round($distance),
-                self::MAX_ALLOWED_DISTANCE
+                'Jarak Anda %.0f meter dari %s (maksimal %.0f meter). Silakan mendekati lokasi untuk melakukan absensi.',
+                $distance,
+                $companyName,
+                $maxDistance
             ));
         }
-
-        return $distance;
     }
 
     /**
@@ -302,7 +360,8 @@ class AttendanceController extends Controller
      */
     private function countWorkingDays(int $month, int $year): int
     {
-        $date = Carbon::create($year, $month, 1, 0, 0, 0, 'Asia/Jakarta');
+        $timezone = setting('timezone', 'Asia/Jakarta');
+        $date = Carbon::create($year, $month, 1, 0, 0, 0, $timezone);
         $days = 0;
 
         while ($date->month == $month) {
@@ -336,7 +395,8 @@ class AttendanceController extends Controller
      */
     private function formatAttendanceData(Attendance $attendance): array
     {
-        $time = Carbon::parse($attendance->present_at)->setTimezone('Asia/Jakarta');
+        $timezone = setting('timezone', 'Asia/Jakarta');
+        $time = Carbon::parse($attendance->present_at)->setTimezone($timezone);
         
         return [
             'id' => $attendance->id,
@@ -346,21 +406,23 @@ class AttendanceController extends Controller
             'coordinates' => [
                 'latitude' => $attendance->latitude,
                 'longitude' => $attendance->longitude
-            ]
+            ],
+            'distance' => $attendance->distance ? round($attendance->distance) : null,
+            'photo_url' => $attendance->photo_path ? asset('storage/'.$attendance->photo_path) : null
         ];
     }
 
     /**
      * Get current server time information
      */
-    private function currentServerTime(): array
+    private function currentServerTime($timezone = 'Asia/Jakarta'): array
     {
-        $now = now('Asia/Jakarta');
+        $now = now($timezone);
         return [
             'time' => $now->format('H:i:s'),
             'date' => $now->format('d F Y'),
             'day' => $now->translatedFormat('l'),
-            'timezone' => 'Asia/Jakarta (WIB)',
+            'timezone' => $timezone,
             'timestamp' => $now->timestamp
         ];
     }

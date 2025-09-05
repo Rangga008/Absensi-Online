@@ -10,12 +10,14 @@ class CheckAdminSession
 {
     public function handle(Request $request, Closure $next)
     {
-        // Skip middleware for login/logout routes
+        // Skip middleware untuk login/logout routes
         if ($request->routeIs('admin.login') || 
             $request->routeIs('admin.login.process') || 
             $request->routeIs('admin.logout') ||
             $request->is('admin/login') || 
-            $request->is('admin/logout')) {
+            $request->is('admin/logout') ||
+            $request->routeIs('admin.register') ||
+            $request->routeIs('admin.register.process')) {
             return $next($request);
         }
 
@@ -29,7 +31,7 @@ class CheckAdminSession
             'all_session' => session()->all()
         ]);
 
-        // Check if admin is logged in
+        // Check jika admin sudah login
         if (!session('is_admin') || !session('admin_id')) {
             Log::warning('Admin session check failed - redirecting to login', [
                 'path' => $request->path(),
@@ -37,7 +39,10 @@ class CheckAdminSession
                 'admin_id' => session('admin_id')
             ]);
             
-            return redirect()->route('admin.login')->with('message', 'Please login as admin');
+            // Clear session dan redirect ke login
+            $request->session()->flush();
+            return redirect()->route('admin.login')
+                ->with('message', 'Sesi telah berakhir, silakan login kembali');
         }
 
         // Additional check: verify admin role
@@ -45,7 +50,8 @@ class CheckAdminSession
             Log::warning('Invalid admin role', ['role_id' => session('role_id')]);
             
             $request->session()->flush();
-            return redirect()->route('admin.login')->with('message', 'Invalid admin credentials');
+            return redirect()->route('admin.login')
+                ->with('message', 'Kredensial admin tidak valid');
         }
 
         Log::info('Admin session valid', ['admin_id' => session('admin_id')]);

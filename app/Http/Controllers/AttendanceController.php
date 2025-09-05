@@ -105,16 +105,20 @@ public function userAttendances(User $user)
     try {
         $attendances = $user->attendances()
             ->orderBy('present_at', 'desc')
-            ->paginate(10); // Changed from get() to paginate(10)
+            ->paginate(10);
             
+        // Get office location from settings
+        $officeLat = (float) setting('office_lat', -6.906000);
+        $officeLng = (float) setting('office_lng', 107.623400);
+        
         // Calculate distance for each attendance
-        $attendances->getCollection()->transform(function($attendance) {
+        $attendances->getCollection()->transform(function($attendance) use ($officeLat, $officeLng) {
             if ($attendance->latitude && $attendance->longitude) {
                 $attendance->distance = $this->calculateDistance(
                     $attendance->latitude,
                     $attendance->longitude,
-                    -6.906000, // SMKN 2 Bandung latitude
-                    107.623400 // SMKN 2 Bandung longitude
+                    $officeLat,
+                    $officeLng
                 );
             }
             return $attendance;
@@ -132,13 +136,21 @@ public function userAttendances(User $user)
 
 private function calculateDistance($lat1, $lon1, $lat2, $lon2)
 {
-    $theta = $lon1 - $lon2;
-    $dist = sin(deg2rad($lat1)) * sin(deg2rad($lat2)) + 
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($theta));
-    $dist = acos($dist);
-    $dist = rad2deg($dist);
-    $miles = $dist * 60 * 1.1515;
-    return round($miles * 1609.344); // Convert to meters
+    $earthRadius = 6371000; // Earth radius in meters
+    
+    // Convert from degrees to radians
+    $latFrom = deg2rad($lat1);
+    $lonFrom = deg2rad($lon1);
+    $latTo = deg2rad($lat2);
+    $lonTo = deg2rad($lon2);
+    
+    $latDelta = $latTo - $latFrom;
+    $lonDelta = $lonTo - $lonFrom;
+    
+    $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+        cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+    
+    return round($angle * $earthRadius); // Distance in meters
 }
 
     /**
@@ -177,19 +189,25 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     DB::beginTransaction();
 
     try {
+        // Get office location from settings with fallback values
+        $officeLat = (float) setting('office_lat', -6.906000);
+        $officeLng = (float) setting('office_lng', 107.623400);
+        $maxDistance = (int) setting('max_distance', 500);
+        $companyName = setting('company_name', 'sekolah');
+
         // Calculate distance
         $distance = $this->calculateDistance(
             $validated['latitude'],
             $validated['longitude'],
-            -6.906000,
-            107.623400
+            $officeLat,
+            $officeLng
         );
 
         // Location validation
-        if (in_array($validated['description'], ['Hadir', 'Terlambat']) && $distance > 500) {
+        if (in_array($validated['description'], ['Hadir', 'Terlambat']) && $distance > $maxDistance) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda berada di luar radius 500m dari sekolah'
+                'message' => 'Anda berada di luar radius ' . $maxDistance . 'm dari ' . $companyName
             ], 400);
         }
 
@@ -231,7 +249,7 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
             'description' => $validated['description'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'photo_path' => $photoPath, // Make sure this matches your database column
+            'photo_path' => $photoPath,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'distance' => $distance
@@ -277,22 +295,37 @@ public function show($id)
     try {
         $attendance = Attendance::with('user')->findOrFail($id);
         
+        // Get office location from settings
+        $officeLat = (float) setting('office_lat', -6.906000);
+        $officeLng = (float) setting('office_lng', 107.623400);
+        
+        // Calculate distance using settings
+        if ($attendance->latitude && $attendance->longitude) {
+            $attendance->distance = $this->calculateDistance(
+                $attendance->latitude,
+                $attendance->longitude,
+                $officeLat,
+                $officeLng
+            );
+        }
+        
         // Get recent attendances for the same user (excluding current one)
         $recentAttendances = Attendance::where('user_id', $attendance->user_id)
             ->where('id', '!=', $id)
             ->orderBy('present_at', 'desc')
             ->limit(5)
             ->get();
-               $photoPath = $attendance->photo_path;
-    $exists = Storage::disk('public')->exists($photoPath);
-    $fullPath = storage_path('app/public/'.$photoPath);
-    
-    Log::info('Photo debug', [
-        'photo_path' => $photoPath,
-        'exists' => $exists,
-        'full_path' => $fullPath,
-        'url' => Storage::url($photoPath)
-    ]);
+            
+        $photoPath = $attendance->photo_path;
+        $exists = Storage::disk('public')->exists($photoPath);
+        $fullPath = storage_path('app/public/'.$photoPath);
+        
+        Log::info('Photo debug', [
+            'photo_path' => $photoPath,
+            'exists' => $exists,
+            'full_path' => $fullPath,
+            'url' => Storage::url($photoPath)
+        ]);
 
         return view('admin.attendance.show', compact('attendance', 'recentAttendances'));
     } catch (\Exception $e) {
@@ -341,20 +374,24 @@ public function show($id)
     try {
         $attendance = Attendance::findOrFail($id);
         
+        // Get office location from settings
+        $officeLat = (float) setting('office_lat', -6.906000);
+        $officeLng = (float) setting('office_lng', 107.623400);
+        
         // Gabungkan date dan time menjadi datetime
         $presentAt = Carbon::createFromFormat(
             'Y-m-d H:i', 
             $validated['present_date'] . ' ' . $validated['present_time']
         );
 
-        // Hitung ulang distance berdasarkan koordinat baru
+        // Hitung ulang distance berdasarkan koordinat baru dan settings
         $distance = null;
         if ($validated['latitude'] && $validated['longitude']) {
             $distance = $this->calculateDistance(
                 $validated['latitude'],
                 $validated['longitude'],
-                -6.906000, // SMKN 2 Bandung latitude
-                107.623400 // SMKN 2 Bandung longitude
+                $officeLat,
+                $officeLng
             );
         }
 

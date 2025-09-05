@@ -8,7 +8,7 @@
 
 
         <p>
-        ply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
+        Aplikasi absensi digital ini dirancang untuk memudahkan proses pencatatan kehadiran dengan cara yang lebih modern, cepat, dan akurat. Setiap pengguna dapat melakukan absensi secara langsung dari perangkat mereka, dengan verifikasi lokasi asli (GPS) sehingga memastikan kehadiran benar-benar dilakukan di area yang ditentukan. Selain itu, aplikasi ini juga dilengkapi dengan fitur foto saat absen, yang berfungsi sebagai bukti visual untuk meningkatkan transparansi dan mencegah kecurangan. Tidak hanya sekadar mencatat kehadiran, sistem ini juga menyediakan manajemen absensi terpusat yang memungkinkan admin atau pihak manajemen untuk memantau data kehadiran, mengelola jadwal kerja, serta membuat laporan secara real-time. Dengan kombinasi fitur lokasi, foto, dan manajemen yang terintegrasi, aplikasi ini menghadirkan solusi absensi yang lebih efisien, aman, dan terpercaya.
         </p>
     </div>
 </div>

@@ -15,9 +15,9 @@
                         </a>
                         
                         <div class="text-center">
-                            <img src="{{ asset('images/logo-smk2.png') }}" width="100" alt="SMKN 2 Bandung" class="mb-3">
-                            <h1 class="h4 text-gray-900 mb-1">Sistem Absensi Digital</h1>
-                            <h2 class="h5 text-success mb-4">SMK Negeri 2 Bandung</h2>
+                            <img src="{{ app_logo() }}" width="100" alt="SMKN 2 Bandung" class="mb-3">
+                            <h1 class="h4 text-gray-900 mb-1">{{ strtoupper(setting('app_name', 'SMK NEGERI 2 BANDUNG')) }}</h1>
+                            <h2 class="h5 text-success mb-4">{{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}</h2>
                             
                             <!-- Live Clock -->
                             <div class="mb-4">
@@ -71,7 +71,7 @@
                         
                         <div class="text-center mt-2">
                             <p class="small text-muted">
-                                <i class="fas fa-map-marker-alt mr-1"></i> Jl. Ciliwung No.4, Cihapit, Bandung
+                                <i class="fas fa-map-marker-alt mr-1"></i>
                             </p>
                         </div>
                     </div>
