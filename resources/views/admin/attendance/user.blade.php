@@ -3,9 +3,17 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0 text-gray-800">Attendance Records for {{ $user->name }}</h1>
-    <a href="{{ route('admin.attendances.index') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left mr-2"></i>Back to All Users
-    </a>
+    <div>
+        <a href="{{ route('admin.attendances.exportUserPdf', $user->id) }}" class="btn btn-danger mr-2" target="_blank">
+            <i class="fas fa-file-pdf"></i> Export PDF
+        </a>
+        <a href="{{ route('admin.attendances.exportUserExcel', $user->id) }}" class="btn btn-success mr-2" target="_blank">
+            <i class="fas fa-file-excel"></i> Export Excel
+        </a>
+        <a href="{{ route('admin.attendances.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>Back to All Users
+        </a>
+    </div>
 </div>
 
 <div class="card shadow mb-4">
@@ -92,7 +100,7 @@
             <div class="modal-body">
                 <div id="map"></div>
                 <div class="mt-3">
-                    <p><strong>Distance from SMKN 2 Bandung:</strong> <span id="distanceDisplay"></span> meters</p>
+                    <p><strong>Distance from {{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}:</strong> <span id="distanceDisplay"></span> meters</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -137,7 +145,7 @@ $(document).ready(function() {
         
         L.marker([schoolLat, schoolLng], {icon: schoolIcon})
             .addTo(map)
-            .bindPopup('<b>SMKN 2 Bandung</b>');
+            .bindPopup('<b>{{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }}</b>');
         
         // Add attendance location marker
         const userIcon = L.divIcon({

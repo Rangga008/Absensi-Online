@@ -20,7 +20,9 @@
                     <select name="user_id" class="form-control" required>
                         <option value="">Select Employee</option>
                         @foreach($users as $user)
-                        <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->nip ?? 'N/A' }})</option>
+                        <option value="{{ $user->id }}" {{ (isset($selectedUserId) && $selectedUserId == $user->id) ? 'selected' : '' }}>
+                            {{ $user->name }} ({{ $user->nip ?? 'N/A' }})
+                        </option>
                         @endforeach
                     </select>
                 </div>

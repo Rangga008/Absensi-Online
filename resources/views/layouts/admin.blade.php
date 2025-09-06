@@ -62,10 +62,14 @@
                     <!-- Topbar Search -->
                     <form class="d-none d-sm-inline-block form-inline mr-auto ml-md-3 my-2 my-md-0 mw-100 navbar-search" method="GET" action="{{ request()->url() }}">
                         <div class="input-group">
-                            <input type="text" name="search" class="form-control bg-light border-0 small" 
-                                   placeholder="Search {{ strtolower(str_replace('admin.', '', str_replace('.index', '', Route::currentRouteName()))) }}..." 
-                                   aria-label="Search" aria-describedby="basic-addon2" 
+                            <input type="text" name="search" class="form-control bg-light border-0 small"
+                                   placeholder="Search {{ strtolower(str_replace('admin.', '', str_replace('.index', '', Route::currentRouteName()))) }}..."
+                                   aria-label="Search" aria-describedby="basic-addon2"
                                    value="{{ request('search') }}">
+                            <!-- Preserve other filter parameters -->
+                            @foreach(request()->except('search') as $key => $value)
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endforeach
                             <div class="input-group-append">
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-search fa-sm"></i>
@@ -84,11 +88,15 @@
                             </a>
                             <!-- Dropdown - Messages -->
                             <div class="dropdown-menu dropdown-menu-right p-3 shadow animated--grow-in" aria-labelledby="searchDropdown">
-                                <form class="form-inline mr-auto w-100 navbar-search">
+                                <form class="form-inline mr-auto w-100 navbar-search" method="GET" action="{{ request()->url() }}">
                                     <div class="input-group">
-                                        <input type="text" class="form-control bg-light border-0 small" placeholder="Search for..." aria-label="Search" aria-describedby="basic-addon2">
+                                        <input type="text" name="search" class="form-control bg-light border-0 small" placeholder="Search for..." aria-label="Search" aria-describedby="basic-addon2" value="{{ request('search') }}">
+                                        <!-- Preserve other filter parameters -->
+                                        @foreach(request()->except('search') as $key => $value)
+                                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                        @endforeach
                                         <div class="input-group-append">
-                                            <button class="btn btn-primary" type="button">
+                                            <button class="btn btn-primary" type="submit">
                                                 <i class="fas fa-search fa-sm"></i>
                                             </button>
                                         </div>
@@ -196,6 +204,8 @@
     <!-- Page level custom scripts -->
     <script src="{{ asset('sbadmin') }}/js/demo/chart-area-demo.js"></script>
     <script src="{{ asset('sbadmin') }}/js/demo/chart-pie-demo.js"></script>
+
+    @stack('scripts')
 
     <!-- Force favicon refresh -->
     <script>

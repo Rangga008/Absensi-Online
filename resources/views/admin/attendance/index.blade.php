@@ -46,27 +46,7 @@
     background: #f8f9fa;
 }
 
-#attendanceTable th.sortable:hover {
-    background-color: #e9ecef;
-    cursor: pointer;
-}
 
-#attendanceTable th.sortable::after {
-    content: '⇅';
-    margin-left: 5px;
-    font-size: 0.8em;
-    color: #6c757d;
-}
-
-#attendanceTable th.sorted-asc::after {
-    content: '↑';
-    color: #4e73df;
-}
-
-#attendanceTable th.sorted-desc::after {
-    content: '↓';
-    color: #4e73df;
-}
 
 .badge-attendance {
     font-size: 0.8em;
@@ -135,9 +115,17 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0 text-gray-800">Attendance Management</h1>
-    <a href="{{ route('admin.attendances.create') }}" class="btn btn-primary">
-        <i class="fas fa-plus mr-2"></i>Add Attendance
-    </a>
+    <div>
+        <a href="{{ route('admin.attendances.import.form') }}" class="btn btn-info mr-2">
+            <i class="fas fa-file-import mr-2"></i>Import
+        </a>
+        <a href="{{ route('admin.attendances.export.form') }}" class="btn btn-success mr-2">
+            <i class="fas fa-file-export mr-2"></i>Export Attendance
+        </a>
+        <a href="{{ route('admin.attendances.create') }}" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>Add Attendance
+        </a>
+    </div>
 </div>
 
 <div class="card shadow mb-4">
@@ -146,6 +134,57 @@
     </div>
     
     <div class="card-body">
+        <!-- Filter Section -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="search"><strong>Search:</strong></label>
+                    <div class="input-group">
+                    <input type="text" class="form-control" id="search" placeholder="Search by name..." onkeyup="filterTable()">
+                        <div class="input-group-append">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="role_id"><strong>Filter by Role:</strong></label>
+                    <select class="form-control" id="role_id" onchange="filterTable()">
+                        <option value="">All Roles</option>
+                        @foreach($roles as $role)
+                            <option value="{{ $role->id }}">
+                                {{ $role->role_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="status"><strong>Filter by Status:</strong></label>
+                    <select class="form-control" id="status" onchange="filterTable()">
+                        <option value="">All Status</option>
+                        <option value="present">Hadir</option>
+                        <option value="late">Terlambat</option>
+                        <option value="absent">Sakit/Izin</option>
+                        <option value="other">Dinas Luar/WFH</option>
+                        <option value="no_record">No Record</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="reset"><strong>Reset Filters:</strong></label>
+                    <button class="btn btn-outline-secondary btn-block" onclick="resetFilters()">
+                        <i class="fas fa-sync-alt mr-2"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
         @if($users->isEmpty())
             <div class="empty-state">
                 <i class="fas fa-user-clock"></i>
@@ -158,24 +197,30 @@
                 <thead>
                     <tr>
                         <th>No</th>
-                        <th class="sortable {{ request('sort') == 'name' ? 'sorted-' . request('direction', 'asc') : '' }}" 
-                            data-sort="name">Name</th>
-                        <th class="sortable {{ request('sort') == 'role' ? 'sorted-' . request('direction', 'asc') : '' }}" 
-                            data-sort="role">Role</th>
+                        <th>Name</th>
+                        <th>Role</th>
                         <th>Total Attendance</th>
-                        <th class="sortable {{ request('sort') == 'last_attendance' ? 'sorted-' . request('direction', 'asc') : '' }}" 
-                            data-sort="last_attendance">Last Attendance</th>
+                        <th>Last Attendance</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($users as $index => $user)
-                        <tr>
+                        <tr data-user-id="{{ $user->id }}" data-role-id="{{ $user->role_id }}" data-status="{{ $user->latestAttendance ? \App\Http\Controllers\AttendanceController::getStatusFilterValue($user->latestAttendance->description) : 'no_record' }}" data-name="{{ $user->name }}">
                             <td>{{ $users->firstItem() + $index }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    
+                                    @if($user->profile_photo_path)
+                                        <img src="{{ asset('storage/' . $user->profile_photo_path) }}"
+                                             class="user-avatar"
+                                             alt="{{ $user->name }}">
+                                    @else
+                                        <div class="avatar bg-primary text-white rounded-circle mr-2 d-flex align-items-center justify-content-center"
+                                             style="width: 32px; height: 32px;">
+                                            {{ substr($user->name, 0, 1) }}
+                                        </div>
+                                    @endif
                                     <span>{{ $user->name }}</span>
                                 </div>
                             </td>
@@ -215,16 +260,18 @@
                                     <span class="badge badge-{{ $badgeClass }} last-attendance-status">
                                         {{ $status }}
                                     </span>
+                                @else
+                                    <span class="badge badge-light">No Record</span>
                                 @endif
                             </td>
                             <td class="action-buttons">
-                                <a href="{{ route('admin.users.attendances', $user->id) }}" 
-                                class="btn btn-sm btn-info" 
+                                <a href="{{ route('admin.users.attendances', $user->id) }}"
+                                class="btn btn-sm btn-info"
                                 title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ route('admin.attendances.create', ['user_id' => $user->id]) }}" 
-                                class="btn btn-sm btn-success" 
+                                <a href="{{ route('admin.attendances.create', ['user_id' => $user->id]) }}"
+                                class="btn btn-sm btn-success"
                                 title="Add Attendance">
                                     <i class="fas fa-plus"></i>
                                 </a>
@@ -239,7 +286,7 @@
                         Showing {{ $users->firstItem() }} to {{ $users->lastItem() }} of {{ $users->total() }} entries
                     </div>
                     <div>
-                        {{ $users->appends(request()->query())->links() }}
+                        {{ $users->links() }}
                     </div>
                 </div>
             </div>
@@ -248,79 +295,51 @@
 </div>
 @endsection
 
-@section('scripts')
+@if(session('role_id') !== 3)
 <script>
-$(document).ready(function() {
-    // Handle role filter change
-    $('#roleFilter').change(function() {
-        updateFilters();
+function filterTable() {
+    const searchFilter = document.getElementById('search').value.toLowerCase();
+    const roleFilter = document.getElementById('role_id').value;
+    const statusFilter = document.getElementById('status').value;
+
+    const rows = document.querySelectorAll('#attendanceTable tbody tr');
+
+    rows.forEach(row => {
+        const name = row.getAttribute('data-name').toLowerCase();
+        const roleId = row.getAttribute('data-role-id');
+        const status = row.getAttribute('data-status');
+
+        const searchMatch = searchFilter === '' || name.includes(searchFilter);
+        const roleMatch = roleFilter === '' || roleId === roleFilter;
+        const statusMatch = statusFilter === '' || status === statusFilter;
+
+        row.style.display = searchMatch && roleMatch && statusMatch ? '' : 'none';
     });
-    
-    // Handle status filter change
-    $('#statusFilter').change(function() {
-        updateFilters();
-    });
-    
-    // Handle sorting
-    $('.sortable').click(function() {
-        const sortField = $(this).data('sort');
-        const currentSort = '{{ request('sort') }}';
-        const currentDirection = '{{ request('direction', 'asc') }}';
-        
-        let newDirection = 'asc';
-        if (currentSort === sortField) {
-            newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-        }
-        
-        updateFilters({
-            sort: sortField,
-            direction: newDirection
-        });
-    });
-    
-    function updateFilters(additionalParams = {}) {
-        const params = {
-            role_id: $('#roleFilter').val(),
-            status: $('#statusFilter').val(),
-            ...additionalParams
-        };
-        
-        // Remove empty params
-        Object.keys(params).forEach(key => {
-            if (params[key] === 'all' || params[key] === '') {
-                delete params[key];
-            }
-        });
-        
-        // Convert to URL
-        const queryString = $.param(params);
-        window.location.href = "{{ route('admin.attendances.index') }}" + (queryString ? '?' + queryString : '');
-    }
-    
-    // Auto-refresh every 30 seconds
-    let refreshInterval = setInterval(refreshData, 30000);
-    
-    function refreshData() {
-        $.ajax({
-            url: window.location.href,
-            data: { ajax: 1 },
-            success: function(data) {
-                const $newData = $(data);
-                $('#attendanceTable tbody').html($newData.find('#attendanceTable tbody').html());
-                $('.pagination').html($newData.find('.pagination').html());
-            }
-        });
-    }
-    
-    // Pause auto-refresh when tab is inactive
-    $(window).focus(function() {
-        if (!refreshInterval) {
-            refreshInterval = setInterval(refreshData, 30000);
-        }
-    }).blur(function() {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-    });
+}
+
+function resetFilters() {
+    document.getElementById('search').value = '';
+    document.getElementById('role_id').value = '';
+    document.getElementById('status').value = '';
+    filterTable();
+}
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('search').addEventListener('keyup', debounce(filterTable, 500));
+    document.getElementById('role_id').addEventListener('change', filterTable);
+    document.getElementById('status').addEventListener('change', filterTable);
+
+    // Initial filter on page load
+    filterTable();
 });
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
 </script>
-@endsection
+@endif

@@ -9,116 +9,100 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Debug untuk melihat apa yang terjadi
-        Log::info('Dashboard accessed', [
-            'session_id' => $request->session()->getId(),
-            'session_data' => session()->all(),
-            'is_admin' => session('is_admin'),
-            'admin_id' => session('admin_id'),
-            'role_id' => session('role_id'),
-            'url' => $request->fullUrl(),
-            'method' => $request->method(),
-            'headers' => $request->headers->all()
-        ]);
-
-        // Temporary: Bypass session check untuk debugging
-        // HAPUS SETELAH MASALAH TERATASI
         if (!session('is_admin')) {
-            Log::warning('No admin session found in dashboard');
-            // Sementara tampilkan data debug
-            dd([
-                'message' => 'No admin session',
-                'session' => session()->all(),
-                'request_path' => $request->path(),
-                'route_name' => $request->route() ? $request->route()->getName() : 'no route'
-            ]);
+            return redirect()->route('admin.login');
         }
 
-        // Jika session ada, siapkan data untuk view
         try {
-            // Siapkan semua data yang mungkin dibutuhkan view
+            // Basic counts
             $data = [
                 'admin_name' => session('admin_name'),
                 'admin_email' => session('admin_email'),
-                'users' => 0,
-                'attendances' => 0,
-                'roles' => 0,
-                'concessions' => 0,
-                'salaries' => 0,
-                'total_users' => 0,
-                'total_attendances' => 0,
-                'total_roles' => 0,
-                'total_concessions' => 0,
-                'total_salaries' => 0
+                'total_users' => \App\Models\User::count(),
+                'total_roles' => \App\Models\Role::count(),
+                'total_concessions' => \App\Models\Concession::count(),
+                'total_salaries' => \App\Models\Salary::count(),
             ];
 
-            // Coba ambil data dari database
-            try {
-                if (class_exists('\App\Models\User')) {
-                    $data['users'] = \App\Models\User::count();
-                    $data['total_users'] = $data['users'];
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not get users count', ['error' => $e->getMessage()]);
+            // Attendance statistics
+            $attendanceModel = \App\Models\Attendance::class;
+
+            // Today's attendance
+            $data['today_attendances'] = $attendanceModel::whereDate('present_date', today())->count();
+
+            // This week's attendance
+            $data['week_attendances'] = $attendanceModel::whereBetween('present_date', [
+                now()->startOfWeek(),
+                now()->endOfWeek()
+            ])->count();
+
+            // This month's attendance
+            $data['month_attendances'] = $attendanceModel::whereBetween('present_date', [
+                now()->startOfMonth(),
+                now()->endOfMonth()
+            ])->count();
+
+            // Total attendances
+            $data['total_attendances'] = $attendanceModel::count();
+
+            // Attendance by status
+            $data['attendance_by_status'] = $attendanceModel::selectRaw('description, COUNT(*) as count')
+                ->groupBy('description')
+                ->get()
+                ->pluck('count', 'description')
+                ->toArray();
+
+            // Recent attendances (last 10)
+            $data['recent_attendances'] = $attendanceModel::with('user')
+                ->orderBy('present_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Attendance trend for the last 7 days
+            $data['attendance_trend'] = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $date = now()->subDays($i)->format('Y-m-d');
+                $data['attendance_trend'][] = [
+                    'date' => $date,
+                    'count' => $attendanceModel::whereDate('present_date', $date)->count()
+                ];
             }
 
-            try {
-                if (class_exists('\App\Models\Attendance')) {
-                    $data['attendances'] = \App\Models\Attendance::whereDate('created_at', today())->count();
-                    $data['total_attendances'] = \App\Models\Attendance::count();
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not get attendances count', ['error' => $e->getMessage()]);
-            }
+            // Users with most attendances this month
+            $data['top_users'] = \App\Models\User::withCount(['attendances' => function ($query) {
+                $query->whereBetween('present_date', [now()->startOfMonth(), now()->endOfMonth()]);
+            }])
+            ->orderBy('attendances_count', 'desc')
+            ->limit(5)
+            ->get();
 
-            try {
-                if (class_exists('\App\Models\Role')) {
-                    $data['roles'] = \App\Models\Role::count();
-                    $data['total_roles'] = $data['roles'];
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not get roles count', ['error' => $e->getMessage()]);
-            }
+            // Attendance rate calculation
+            $totalUsers = $data['total_users'];
+            $thisMonthAttendances = $data['month_attendances'];
+            $data['attendance_rate'] = $totalUsers > 0 ? round(($thisMonthAttendances / ($totalUsers * now()->daysInMonth)) * 100, 1) : 0;
 
-            try {
-                if (class_exists('\App\Models\Concession')) {
-                    $data['concessions'] = \App\Models\Concession::count();
-                    $data['total_concessions'] = $data['concessions'];
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not get concessions count', ['error' => $e->getMessage()]);
-            }
-
-            try {
-                if (class_exists('\App\Models\Salary')) {
-                    $data['salaries'] = \App\Models\Salary::count();
-                    $data['total_salaries'] = $data['salaries'];
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not get salaries count', ['error' => $e->getMessage()]);
-            }
-
-            Log::info('Dashboard data prepared', $data);
-            
             return view('admin.dashboard', $data);
-            
+
         } catch (\Exception $e) {
-            Log::error('Dashboard view error', ['error' => $e->getMessage()]);
-            
-            // Fallback: Return dengan data minimal
+            Log::error('Dashboard error', ['error' => $e->getMessage()]);
+
+            // Fallback data
             return view('admin.dashboard', [
                 'admin_name' => session('admin_name', 'Admin'),
                 'admin_email' => session('admin_email', 'admin@example.com'),
-                'users' => 0,
-                'attendances' => 0,
-                'roles' => 0,
-                'concessions' => 0,
-                'salaries' => 0,
                 'total_users' => 0,
-                'total_attendances' => 0,
                 'total_roles' => 0,
                 'total_concessions' => 0,
                 'total_salaries' => 0,
+                'today_attendances' => 0,
+                'week_attendances' => 0,
+                'month_attendances' => 0,
+                'total_attendances' => 0,
+                'attendance_by_status' => [],
+                'recent_attendances' => collect(),
+                'attendance_trend' => [],
+                'top_users' => collect(),
+                'attendance_rate' => 0,
                 'error' => 'Some data could not be loaded: ' . $e->getMessage()
             ]);
         }

@@ -10,6 +10,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceImportController;
+
 use App\Http\Controllers\ConcessionController;
 use App\Http\Controllers\SettingController;
 
@@ -92,6 +94,22 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
     ]);
 
     // Attendance Routes
+    // Add these missing import routes BEFORE the resource route
+    Route::get('attendances/import', [AttendanceImportController::class, 'showImportForm'])
+        ->name('admin.attendances.import.form');
+
+    Route::post('attendances/import', [AttendanceImportController::class, 'import'])
+        ->name('admin.attendances.import');
+
+    Route::get('attendances/import/template', [AttendanceImportController::class, 'downloadTemplate'])
+        ->name('admin.attendances.import.template');
+
+    // Export routes - MUST be before resource route to avoid conflict
+    Route::get('attendances/export', [AttendanceController::class, 'showExportForm'])
+        ->name('admin.attendances.export.form');
+    Route::post('attendances/export', [AttendanceController::class, 'processExport'])
+        ->name('admin.attendances.export.process');
+
     Route::resource('attendances', AttendanceController::class)->names([
         'index' => 'admin.attendances.index',
         'create' => 'admin.attendances.create',
@@ -101,11 +119,17 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         'update' => 'admin.attendances.update',
         'destroy' => 'admin.attendances.destroy'
     ]);
-    
+
     // User-specific attendances
     Route::get('users/{user}/attendances', [AttendanceController::class, 'userAttendances'])
         ->name('admin.users.attendances');
-    
+
+    // User attendance export routes
+    Route::get('attendances/user/{user}/export-pdf', [AttendanceController::class, 'exportUserPdf'])
+        ->name('admin.attendances.exportUserPdf');
+    Route::get('attendances/user/{user}/export-excel', [AttendanceController::class, 'exportUserExcel'])
+        ->name('admin.attendances.exportUserExcel');
+
     // Concessions
      Route::resource('concessions', ConcessionController::class)->names([
         'index' => 'admin.concessions.index',
@@ -116,16 +140,13 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         'update' => 'admin.concessions.update',
         'destroy' => 'admin.concessions.destroy'
     ]);
-    
+
     // Tambahkan routes untuk approve/reject
     Route::post('concessions/{id}/approve', [ConcessionController::class, 'approve'])
          ->name('admin.concessions.approve');
     Route::post('concessions/{id}/reject', [ConcessionController::class, 'reject'])
          ->name('admin.concessions.reject');
 });
-
-
-
 /** Route untuk AJAX requests */
 Route::prefix('api')->group(function () {
 
@@ -133,6 +154,19 @@ Route::prefix('api')->group(function () {
         ->name('attendance.stats');
     Route::post('/attendance', [UserAttendanceController::class, 'store'])
         ->name('attendance.store');
+});
+
+// Export form and process routes
+Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
+    Route::get('attendances/export', [AttendanceController::class, 'showExportForm'])
+        ->name('admin.attendances.export.form');
+    Route::post('attendances/export', [AttendanceController::class, 'processExport'])
+        ->name('admin.attendances.export.process');
+    Route::get('/attendance/export', [AttendanceController::class, 'export'])
+    ->name('attendance.export');
+    Route::post('/attendance/export', [AttendanceController::class, 'export'])
+    ->name('attendance.export');
+
 });
 
 // Route untuk mendapatkan pengaturan absensi

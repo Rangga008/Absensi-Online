@@ -12,6 +12,9 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\AttendanceExport;
 
 class AttendanceController extends Controller
 {
@@ -23,70 +26,17 @@ class AttendanceController extends Controller
     if (!session('is_admin')) {
         return redirect()->route('admin.login');
     }
-    
+
     try {
         // Get all roles
         $roles = Role::whereNull('deleted_at')->get();
 
-        $search = $request->get('search');
-
-        $query = User::withCount('attendances')
+        // Get all users with their attendance data for client-side filtering
+        $users = User::withCount('attendances')
             ->with(['latestAttendance'])
             ->with('role')
-            ->when($search, function($q) use ($search) {
-                $q->where(function($query) use ($search) {
-                    $query->where('name', 'like', "%$search%")
-                          ->orWhereHas('role', function($q) use ($search) {
-                              $q->where('role_name', 'like', "%$search%");
-                          })
-                          ->orWhereHas('latestAttendance', function($q) use ($search) {
-                              $q->where('description', 'like', "%$search%");
-                          });
-                });
-            })
-            ->when($request->has('role_id') && $request->role_id != 'all', function($q) use ($request) {
-                $q->where('role_id', $request->role_id);
-            })
-            ->when($request->has('status') && $request->status != 'all', function($q) use ($request) {
-                $q->whereHas('latestAttendance', function($query) use ($request) {
-                    if ($request->status == 'present') {
-                        $query->where('description', 'Hadir');
-                    } elseif ($request->status == 'late') {
-                        $query->where('description', 'Terlambat');
-                    } elseif ($request->status == 'absent') {
-                        $query->whereIn('description', ['Sakit', 'Izin']);
-                    }
-                });
-            });
-            
-            
-        // Handle sorting
-        if ($request->has('sort')) {
-            $sortColumn = $request->get('sort');
-            $sortDirection = $request->get('direction', 'asc');
-            
-            if ($sortColumn === 'role') {
-                $query->join('roles', 'users.role_id', '=', 'roles.id')
-                      ->orderBy('roles.role_name', $sortDirection)
-                      ->select('users.*');
-            } 
-            elseif ($sortColumn === 'last_attendance') {
-                $query->leftJoin('attendances', function($join) {
-                    $join->on('users.id', '=', 'attendances.user_id')
-                         ->whereRaw('attendances.present_at = (SELECT MAX(present_at) FROM attendances WHERE attendances.user_id = users.id)');
-                })
-                ->orderBy('attendances.present_at', $sortDirection);
-            }
-            else {
-                $query->orderBy($sortColumn, $sortDirection);
-            }
-        } else {
-            // Default sorting
-            $query->orderBy('name', 'asc');
-        }
-        
-
-        $users = $query->paginate(10);
+            ->orderBy('name', 'asc')
+            ->paginate(50); // Increased pagination for better filtering experience
 
         return view('admin.attendance.index', compact('users', 'roles'));
     } catch (\Exception $e) {
@@ -156,15 +106,20 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     /**
      * Show attendance creation form (admin)
      */
-    public function create()
+    public function create(Request $request)
     {
         if (!session('is_admin')) {
             return redirect()->route('admin.login');
         }
-        
+
         try {
-            $users = User::where('role_id', '!=', 1)->get(); // Exclude admin users
-            return view('admin.attendance.create', compact('users'));
+            // Get all users without role restrictions
+            $users = User::orderBy('name')->get();
+
+            // Get user_id from request if provided (for auto-selection)
+            $selectedUserId = $request->get('user_id');
+
+            return view('admin.attendance.create', compact('users', 'selectedUserId'));
         } catch (\Exception $e) {
             Log::error('Error loading create form', ['error' => $e->getMessage()]);
             return back()->with('error', 'Error loading form: ' . $e->getMessage());
@@ -474,5 +429,500 @@ public function checkAttendanceStatus(Request $request)
 
 // Tambahkan method baru untuk menampilkan attendance per user
 
+    /**
+     * Export attendance data to Excel
+     */
+    public function exportExcel(Request $request)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $search = $request->get('search');
+            $roleFilter = $request->get('role_id');
+            $statusFilter = $request->get('status');
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
+
+            $query = Attendance::with(['user.role'])
+                ->when($search, function($q) use ($search) {
+                    $q->whereHas('user', function($query) use ($search) {
+                        $query->where('name', 'like', "%$search%")
+                              ->orWhereHas('role', function($q) use ($search) {
+                                  $q->where('role_name', 'like', "%$search%");
+                              });
+                    });
+                })
+                ->when($roleFilter && $roleFilter != 'all', function($q) use ($roleFilter) {
+                    $q->whereHas('user', function($query) use ($roleFilter) {
+                        $query->where('role_id', $roleFilter);
+                    });
+                })
+                ->when($statusFilter && $statusFilter != 'all', function($q) use ($statusFilter) {
+                    if ($statusFilter == 'present') {
+                        $q->where('description', 'Hadir');
+                    } elseif ($statusFilter == 'late') {
+                        $q->where('description', 'Terlambat');
+                    } elseif ($statusFilter == 'absent') {
+                        $q->whereIn('description', ['Sakit', 'Izin']);
+                    } elseif ($statusFilter == 'other') {
+                        $q->whereIn('description', ['Dinas Luar', 'WFH']);
+                    }
+                })
+                ->when($startDate, function($q) use ($startDate) {
+                    $q->whereDate('present_date', '>=', $startDate);
+                })
+                ->when($endDate, function($q) use ($endDate) {
+                    $q->whereDate('present_date', '<=', $endDate);
+                })
+                ->orderBy('present_date', 'desc')
+                ->orderBy('present_at', 'desc');
+
+            $attendances = $query->get();
+
+            $filename = 'attendance_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+
+            return Excel::download(new class($attendances) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithMapping {
+                private $attendances;
+
+                public function __construct($attendances)
+                {
+                    $this->attendances = $attendances;
+                }
+
+                public function collection()
+                {
+                    return $this->attendances;
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'Nama',
+                        'Role',
+                        'Tanggal',
+                        'Waktu',
+                        'Status',
+                        'Latitude',
+                        'Longitude',
+                        'Jarak (m)',
+                        'IP Address'
+                    ];
+                }
+
+                public function map($attendance): array
+                {
+                    return [
+                        $attendance->user->name ?? '',
+                        $attendance->user->role->role_name ?? '',
+                        $attendance->present_date,
+                        $attendance->present_at ? $attendance->present_at->format('H:i:s') : '',
+                        $attendance->description,
+                        $attendance->latitude,
+                        $attendance->longitude,
+                        $attendance->distance,
+                        $attendance->ip_address
+                    ];
+                }
+            }, $filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting attendance to Excel', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export attendance data to PDF
+     */
+    public function exportPdf(Request $request)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $search = $request->get('search');
+            $roleFilter = $request->get('role_id');
+            $statusFilter = $request->get('status');
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
+
+            $query = Attendance::with(['user.role'])
+                ->when($search, function($q) use ($search) {
+                    $q->whereHas('user', function($query) use ($search) {
+                        $query->where('name', 'like', "%$search%")
+                              ->orWhereHas('role', function($q) use ($search) {
+                                  $q->where('role_name', 'like', "%$search%");
+                              });
+                    });
+                })
+                ->when($roleFilter && $roleFilter != 'all', function($q) use ($roleFilter) {
+                    $q->whereHas('user', function($query) use ($roleFilter) {
+                        $query->where('role_id', $roleFilter);
+                    });
+                })
+                ->when($statusFilter && $statusFilter != 'all', function($q) use ($statusFilter) {
+                    if ($statusFilter == 'present') {
+                        $q->where('description', 'Hadir');
+                    } elseif ($statusFilter == 'late') {
+                        $q->where('description', 'Terlambat');
+                    } elseif ($statusFilter == 'absent') {
+                        $q->whereIn('description', ['Sakit', 'Izin']);
+                    } elseif ($statusFilter == 'other') {
+                        $q->whereIn('description', ['Dinas Luar', 'WFH']);
+                    }
+                })
+                ->when($startDate, function($q) use ($startDate) {
+                    $q->whereDate('present_date', '>=', $startDate);
+                })
+                ->when($endDate, function($q) use ($endDate) {
+                    $q->whereDate('present_date', '<=', $endDate);
+                })
+                ->orderBy('present_date', 'desc')
+                ->orderBy('present_at', 'desc');
+
+            $attendances = $query->get();
+
+            $pdf = Pdf::loadView('admin.attendance.export_pdf', compact('attendances', 'search', 'roleFilter', 'statusFilter', 'startDate', 'endDate'));
+
+            $filename = 'attendance_export_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting attendance to PDF', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Show export form
+     */
+    public function showExportForm()
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $users = User::orderBy('name')->get(); // Show all users for export
+            $roles = Role::whereNull('deleted_at')->orderBy('role_name')->get();
+
+            return view('admin.attendance.export', compact('users', 'roles'));
+        } catch (\Exception $e) {
+            Log::error('Error loading export form', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error loading export form: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Process export request
+     */
+    /**
+ * Process export request
+ */
+/**
+ * Process export request with better validation
+ */
+public function export(Request $request)
+{
+    $validated = $request->validate([
+        'export_type' => 'required|in:by_date,by_user,by_role,by_date_range',
+        'format' => 'required|in:excel,pdf',
+        'specific_date' => 'nullable|date',
+        'user_id' => 'nullable|exists:users,id',
+        'role_id' => 'nullable|exists:roles,id',
+        'start_date' => 'nullable|date',
+        'end_date' => 'nullable|date'
+    ]);
+
+    $query = Attendance::with('user.role');
+
+    switch ($validated['export_type']) {
+        case 'by_date':
+            if (empty($validated['specific_date'])) {
+                return back()->with('error', 'Specific date is required for export by date.');
+            }
+            $query->whereDate('present_date', $validated['specific_date']);
+            break;
+        case 'by_user':
+            if (empty($validated['user_id'])) {
+                return back()->with('error', 'User is required for export by user.');
+            }
+            $query->where('user_id', $validated['user_id']);
+            break;
+        case 'by_role':
+            if (empty($validated['role_id'])) {
+                return back()->with('error', 'Role is required for export by role.');
+            }
+            $query->whereHas('user', function($q) use ($validated) {
+                $q->where('role_id', $validated['role_id']);
+            });
+            break;
+        case 'by_date_range':
+            if (empty($validated['start_date']) || empty($validated['end_date'])) {
+                return back()->with('error', 'Start date and end date are required for export by date range.');
+            }
+            $query->whereBetween('present_date', [$validated['start_date'], $validated['end_date']]);
+            break;
+    }
+
+    $attendances = $query->get();
+
+    $filename = 'attendance_export_' . now()->format('Y-m-d_H-i-s');
+
+    if ($validated['format'] === 'excel') {
+        return Excel::download(new AttendanceExport($attendances), $filename . '.xlsx');
+    } else {
+        return $this->exportToPdf($attendances, $filename, $validated);
+    }
+}
+
+    /**
+     * Export user attendance summary
+     */
+    private function exportUserSummary($validated, $format)
+    {
+        $query = User::withCount('attendances')
+            ->with(['role', 'latestAttendance'])
+            ->where('role_id', '!=', 1); // Exclude admin
+
+        if ($validated['summary_type'] === 'by_role' && isset($validated['summary_role_id'])) {
+            $query->where('role_id', $validated['summary_role_id']);
+        }
+
+        $users = $query->orderBy('name')->get();
+
+        $filename = 'attendance_summary_' . now()->format('Y-m-d_H-i-s');
+
+        if ($format === 'excel') {
+            return Excel::download(new class($users) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithMapping {
+                private $users;
+
+                public function __construct($users)
+                {
+                    $this->users = $users;
+                }
+
+                public function collection()
+                {
+                    return $this->users;
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'User ID',
+                        'Nama',
+                        'Role',
+                        'Total Hari Hadir',
+                        'Terakhir Hadir'
+                    ];
+                }
+
+                public function map($user): array
+                {
+                    return [
+                        $user->id,
+                        $user->name,
+                        $user->role->role_name ?? '',
+                        $user->attendances_count ?? 0,
+                        $user->latestAttendance ? $user->latestAttendance->present_date : '-'
+                    ];
+                }
+            }, $filename . '.xlsx');
+        } else {
+            $pdf = Pdf::loadView('admin.attendance.export_summary_pdf', compact('users', 'validated'));
+            return $pdf->download($filename . '.pdf');
+        }
+    }
+
+    /**
+     * Export to Excel
+     */
+    private function exportToExcel($attendances, $filename)
+    {
+        return Excel::download(new class($attendances) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithMapping {
+            private $attendances;
+
+            public function __construct($attendances)
+            {
+                $this->attendances = $attendances;
+            }
+
+            public function collection()
+            {
+                return $this->attendances;
+            }
+
+            public function headings(): array
+            {
+                return [
+                    'Nama',
+                    'Role',
+                    'Tanggal',
+                    'Waktu',
+                    'Status',
+                    'Latitude',
+                    'Longitude',
+                    'Jarak (m)',
+                    'IP Address'
+                ];
+            }
+
+            public function map($attendance): array
+            {
+                return [
+                    $attendance->user->name ?? '',
+                    $attendance->user->role->role_name ?? '',
+                    $attendance->present_date,
+                    $attendance->present_at ? $attendance->present_at->format('H:i:s') : '',
+                    $attendance->description,
+                    $attendance->latitude,
+                    $attendance->longitude,
+                    $attendance->distance,
+                    $attendance->ip_address
+                ];
+            }
+        }, $filename . '.xlsx');
+    }
+
+    /**
+     * Export to PDF
+     */
+    private function exportToPdf($attendances, $filename, $filters)
+    {
+        // Extract individual variables for the PDF view
+        $startDate = $filters['start_date'] ?? null;
+        $endDate = $filters['end_date'] ?? null;
+        $search = $filters['search'] ?? null;
+        $roleFilter = $filters['role_id'] ?? null;
+        $statusFilter = $filters['status'] ?? null;
+
+        $pdf = Pdf::loadView('admin.attendance.export_pdf', compact(
+            'attendances',
+            'startDate',
+            'endDate',
+            'search',
+            'roleFilter',
+            'statusFilter'
+        ));
+        return $pdf->download($filename . '.pdf');
+    }
+
+    /**
+     * Export user attendance to PDF
+     */
+    public function exportUserPdf(User $user)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $attendances = $user->attendances()
+                ->orderBy('present_at', 'desc')
+                ->get();
+
+            $pdf = Pdf::loadView('admin.attendance.export_user_pdf', compact('user', 'attendances'));
+
+            $filename = 'attendance_' . $user->name . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting user attendance to PDF', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export user attendance to Excel
+     */
+    public function exportUserExcel(User $user)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $attendances = $user->attendances()
+                ->orderBy('present_at', 'desc')
+                ->get();
+
+            $filename = 'attendance_' . $user->name . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+
+            return Excel::download(new class($attendances, $user) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithMapping {
+                private $attendances;
+                private $user;
+
+                public function __construct($attendances, $user)
+                {
+                    $this->attendances = $attendances;
+                    $this->user = $user;
+                }
+
+                public function collection()
+                {
+                    return $this->attendances;
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'Tanggal',
+                        'Waktu',
+                        'Status',
+                        'Latitude',
+                        'Longitude',
+                        'Jarak (m)',
+                        'IP Address',
+                        'User Agent'
+                    ];
+                }
+
+                public function map($attendance): array
+                {
+                    return [
+                        $attendance->present_date,
+                        $attendance->present_at ? $attendance->present_at->format('H:i:s') : '',
+                        $attendance->description,
+                        $attendance->latitude,
+                        $attendance->longitude,
+                        $attendance->distance,
+                        $attendance->ip_address,
+                        $attendance->user_agent
+                    ];
+                }
+            }, $filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting user attendance to Excel', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get status filter value for client-side filtering
+     */
+    public static function getStatusFilterValue($description)
+    {
+        switch ($description) {
+            case 'Hadir':
+                return 'present';
+            case 'Terlambat':
+                return 'late';
+            case 'Sakit':
+            case 'Izin':
+                return 'absent';
+            case 'Dinas Luar':
+            case 'WFH':
+                return 'other';
+            default:
+                return 'no_record';
+        }
+    }
 
 }
