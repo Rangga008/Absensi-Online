@@ -12,10 +12,15 @@
 
         <div class="d-flex justify-content-between mb-3">
             <div></div> <!-- Empty div to maintain flex spacing -->
-            
-            <a href="{{ route('admin.users.create') }}" class="btn btn-success">
-                <i class="fas fa-plus mr-1"></i> Add User
-            </a>
+
+            <div>
+                <a href="{{ route('admin.users.import.form') }}" class="btn btn-primary mr-2">
+                    <i class="fas fa-file-import mr-1"></i> Import Users
+                </a>
+                <a href="{{ route('admin.users.create') }}" class="btn btn-success">
+                    <i class="fas fa-plus mr-1"></i> Add User
+                </a>
+            </div>
         </div>
         
         <div id="usersTableContainer">

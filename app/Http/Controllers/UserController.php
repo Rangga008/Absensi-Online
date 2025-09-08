@@ -296,4 +296,102 @@ class UserController extends Controller
             return back()->with('error', 'Error deleting user: ' . $e->getMessage());
         }
     }
+
+    public function showImportForm()
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $roles = Role::all();
+            return view('admin.user.import', compact('roles'));
+        } catch (\Exception $e) {
+            Log::error('Error loading import form', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error loading form: ' . $e->getMessage());
+        }
+    }
+
+    public function import(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:2048',
+            'generate_password' => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        try {
+            $file = $request->file('file');
+            $generatePassword = $request->boolean('generate_password', true);
+
+            $import = new UsersImport($generatePassword);
+            Excel::import($import, $file);
+
+            $importedCount = $import->getImportedCount();
+            $skippedCount = $import->getSkippedCount();
+            $errorCount = $import->getErrorCount();
+            $errors = $import->getErrors();
+
+            $message = "Import completed: {$importedCount} records imported, {$skippedCount} skipped, {$errorCount} errors.";
+
+            if ($errorCount > 0) {
+                return redirect()->back()
+                    ->with('warning', $message)
+                    ->with('import_errors', $errors);
+            }
+
+            return redirect()->route('admin.users.index')
+                ->with('success', $message);
+
+        } catch (\Exception $e) {
+            Log::error('User import error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Import failed: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="user_import_template.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+
+        $callback = function() {
+            $handle = fopen('php://output', 'w');
+
+            // Add CSV headers
+            fputcsv($handle, [
+                'name',
+                'email',
+                'phone',
+                'address',
+                'role_id',
+                'password'
+            ]);
+
+            // Add example data
+            fputcsv($handle, [
+                'John Doe',
+                'john@example.com',
+                '081234567890',
+                'Jl. Example No. 123',
+                '2',
+                'password123'
+            ]);
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

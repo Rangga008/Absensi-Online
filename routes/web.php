@@ -63,6 +63,16 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
          ->name('admin.concessions.create');
         
     // Resources
+    // Add these import routes BEFORE the resource route
+    Route::get('users/import', [UserController::class, 'showImportForm'])
+        ->name('admin.users.import.form');
+
+    Route::post('users/import', [UserController::class, 'import'])
+        ->name('admin.users.import');
+
+    Route::get('users/import/template', [UserController::class, 'downloadTemplate'])
+        ->name('admin.users.import.template');
+
     Route::resource('users', UserController::class)->names([
         'index' => 'admin.users.index',
         'create' => 'admin.users.create',

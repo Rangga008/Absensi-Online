@@ -8,9 +8,9 @@
                 
                 // If logo setting exists and file actually exists
                 if ($logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($logo)) {
-                    // Add timestamp to prevent browser caching
-                    return asset('storage/' . $logo) . '?v=' . time();
+                    return \Illuminate\Support\Facades\Storage::url($logo) . '?v=' . time();
                 }
+
 
                 // Fallback to default logo
                 return asset('images/logo-smk2.png') . '?v=' . time();
