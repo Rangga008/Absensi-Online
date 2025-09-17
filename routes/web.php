@@ -48,6 +48,10 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
     Route::get('/register', [AdminAuthController::class, 'register'])->name('admin.register');
     Route::post('/register', [AdminAuthController::class, 'doRegister'])->name('admin.register.process');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+    Route::patch('users/{user}/restore', [UserController::class, 'restore'])->name('admin.users.restore');
+    Route::delete('users/{user}/force-delete', [UserController::class, 'forceDelete'])->name('admin.users.force-delete');
+    Route::patch('users/restore-all', [UserController::class, 'restoreAll'])->name('admin.users.restore-all');
+    
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');

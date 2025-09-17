@@ -18,35 +18,42 @@ class UserController extends Controller
      * Display a listing of the resource.
      */
     public function index(Request $request)
-{
-    $search = $request->get('search');
-    $sort = $request->get('sort', 'name');
-    $direction = $request->get('direction', 'asc');
+    {
+        $search = $request->get('search');
+        $sort = $request->get('sort', 'name');
+        $direction = $request->get('direction', 'asc');
+        $show_deleted = $request->get('show_deleted', false);
 
-    $users = User::with('role')
-        ->when($search, function($query) use ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                  ->orWhere('email', 'like', "%$search%")
-                  ->orWhere('phone', 'like', "%$search%")
-                  ->orWhere('address', 'like', "%$search%")
-                  ->orWhereHas('role', function($q) use ($search) {
-                      $q->where('role_name', 'like', "%$search%");
-                  });
-            });
-        })
-        ->orderBy($sort, $direction)
-        ->paginate(10);
+        $usersQuery = User::with('role');
+        
+        // Show deleted users if requested
+        if ($show_deleted) {
+            $usersQuery = $usersQuery->onlyTrashed();
+        }
+        
+        $users = $usersQuery->when($search, function($query) use ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%$search%")
+                      ->orWhere('email', 'like', "%$search%")
+                      ->orWhere('phone', 'like', "%$search%")
+                      ->orWhere('address', 'like', "%$search%")
+                      ->orWhereHas('role', function($q) use ($search) {
+                          $q->where('role_name', 'like', "%$search%");
+                      });
+                });
+            })
+            ->orderBy($sort, $direction)
+            ->paginate(10);
 
-    if ($request->ajax()) {
-        return response()->json([
-            'html' => view('admin.user.partials.table', compact('users'))->render(),
-            'pagination' => (string) $users->appends(request()->query())->links()
-        ]);
+        if ($request->ajax()) {
+            return response()->json([
+                'html' => view('admin.user.partials.table', compact('users', 'show_deleted'))->render(),
+                'pagination' => (string) $users->appends(request()->query())->links()
+            ]);
+        }
+
+        return view('admin.user.index', compact('users', 'sort', 'direction', 'search', 'show_deleted'));
     }
-
-    return view('admin.user.index', compact('users', 'sort', 'direction', 'search'));
-}
 
     /**
      * Show the form for creating a new resource.
@@ -276,7 +283,7 @@ class UserController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Soft delete the specified resource (mark as deleted).
      */
     public function destroy($id)
     {
@@ -288,12 +295,93 @@ class UserController extends Controller
                 return back()->with('error', 'Cannot delete the last admin user');
             }
             
+            // Soft delete the user
             $user->delete();
             
-            return redirect()->route('admin.users.index')->with('success', 'User has been deleted successfully!');
+            Log::info('User soft deleted', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'admin_id' => session('admin_id')
+            ]);
+            
+            return redirect()->route('admin.users.index')->with('success', 'User has been moved to trash successfully!');
         } catch (\Exception $e) {
             Log::error('Error deleting user', ['error' => $e->getMessage(), 'id' => $id]);
             return back()->with('error', 'Error deleting user: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Restore soft deleted user.
+     */
+    public function restore($id)
+    {
+        try {
+            $user = User::onlyTrashed()->findOrFail($id);
+            $user->restore();
+            
+            Log::info('User restored', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'admin_id' => session('admin_id')
+            ]);
+            
+            return redirect()->route('admin.users.index')->with('success', 'User has been restored successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error restoring user', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error restoring user: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Permanently delete user from database.
+     */
+    public function forceDelete($id)
+    {
+        try {
+            $user = User::onlyTrashed()->findOrFail($id);
+            $userName = $user->name;
+            
+            // Prevent deleting admin user
+            if ($user->role_id == 1) {
+                return back()->with('error', 'Cannot permanently delete admin user');
+            }
+            
+            $user->forceDelete();
+            
+            Log::warning('User permanently deleted', [
+                'user_id' => $id,
+                'user_name' => $userName,
+                'admin_id' => session('admin_id')
+            ]);
+            
+            return redirect()->route('admin.users.index', ['show_deleted' => 1])
+                ->with('success', 'User has been permanently deleted!');
+        } catch (\Exception $e) {
+            Log::error('Error permanently deleting user', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error permanently deleting user: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Restore all soft deleted users.
+     */
+    public function restoreAll()
+    {
+        try {
+            $count = User::onlyTrashed()->count();
+            User::onlyTrashed()->restore();
+            
+            Log::info('All users restored', [
+                'count' => $count,
+                'admin_id' => session('admin_id')
+            ]);
+            
+            return redirect()->route('admin.users.index')
+                ->with('success', "{$count} users have been restored successfully!");
+        } catch (\Exception $e) {
+            Log::error('Error restoring all users', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error restoring users: ' . $e->getMessage());
         }
     }
 

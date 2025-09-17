@@ -1,0 +1,1 @@
+[13-Sep-2025 07:27:04 Asia/Jakarta] PHP Fatal error:  Cannot redeclare App\Models\User::role() in /home/hexacore/dev.hexacore.my.id/app/Models/User.php on line 68

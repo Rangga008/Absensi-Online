@@ -5,8 +5,10 @@
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sistem Absensi Digital - SMKN 2 Bandung</title>
-    <link rel="icon" href="{{ asset('images/logo-smk2.png') }}">
+    <title>{{ setting('app_name', 'Aplikasi Absen') }}</title>
+    <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
+    <link rel="shortcut icon" href="{{ app_logo() }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ app_logo() }}">
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">

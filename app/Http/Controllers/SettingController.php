@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -68,15 +68,18 @@ class SettingController extends Controller
                 // Generate unique filename
                 $fileName = 'logo-' . time() . '.' . $file->getClientOriginalExtension();
                 
-                // Store in settings directory
-                $logoPath = $file->storeAs('settings', $fileName, 'public');
-
-                if (!$logoPath) {
-                    throw new \Exception('Gagal menyimpan file logo');
+                // Create directory if not exists
+                $logoDir = public_path('uploads/settings');
+                if (!File::exists($logoDir)) {
+                    File::makeDirectory($logoDir, 0755, true);
                 }
+                
+                // Store file in public/uploads/settings directory
+                $file->move($logoDir, $fileName);
+                $logoPath = 'uploads/settings/' . $fileName;
 
                 // Verify file was actually stored
-                if (!Storage::disk('public')->exists($logoPath)) {
+                if (!File::exists(public_path($logoPath))) {
                     throw new \Exception('File logo tidak ditemukan setelah upload');
                 }
 
@@ -86,8 +89,8 @@ class SettingController extends Controller
                 $logoUpdated = true;
 
                 // Delete old logo if exists and different from new one
-                if ($oldLogo && $oldLogo !== $logoPath && Storage::disk('public')->exists($oldLogo)) {
-                    Storage::disk('public')->delete($oldLogo);
+                if ($oldLogo && $oldLogo !== $logoPath && File::exists(public_path($oldLogo))) {
+                    File::delete(public_path($oldLogo));
                     Log::info('Deleted old logo: ' . $oldLogo);
                 }
             }
@@ -106,11 +109,6 @@ class SettingController extends Controller
             Cache::forget('setting_logo');
             Cache::forget('settings');
             
-            // Force clear Laravel config cache if it exists
-            if (function_exists('config_clear')) {
-                config_clear();
-            }
-
             $message = 'Pengaturan berhasil diperbarui!';
             if ($logoUpdated) {
                 $message .= ' Logo baru telah diupload dan akan diterapkan.';

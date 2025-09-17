@@ -14,11 +14,7 @@
             @endif
         </h1>
         
-        @if(session('role_id') !== 3)
-        <a href="{{ route('admin.concessions.create') }}" class="btn btn-success">
-            <i class="fas fa-plus mr-1"></i> Add Concession
-        </a>
-        @endif
+
     </div>
 
     <div class="card shadow">
@@ -220,11 +216,7 @@
                                     <i class="fas fa-file-medical-alt fa-3x mb-3"></i>
                                     <h5>No concessions found</h5>
                                     <p>No concession requests have been submitted yet.</p>
-                                    @if(session('role_id') !== 3)
-                                    <a href="{{ route('admin.concession.create') }}" class="btn btn-primary mt-2">
-                                        <i class="fas fa-plus mr-1"></i> Create First Concession
-                                    </a>
-                                    @endif
+                                    
                                 </div>
                             </td>
                         </tr>

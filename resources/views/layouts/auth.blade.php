@@ -8,9 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description" content="">
     <meta name="author" content="">
+    <title>{{ setting('app_name', 'Aplikasi Absen') }}</title>
     <link rel="icon" href="{{ app_logo() }}" type="image/png" id="favicon">
+    <link rel="shortcut icon" href="{{ app_logo() }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ app_logo() }}">
 
-    <title>SMKN 2 Bandung Admin - Login</title>
 
     <!-- Custom fonts for this template-->
    <link href="{{ asset('sbadmin') }}/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">

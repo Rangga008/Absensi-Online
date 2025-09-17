@@ -5,7 +5,7 @@
 <div class="card p-3 shadow rounded">
     <div id="msg"></div>
     <div>
-        Hai <b>{{ ucfirst(session('username')) }}</b>, selamat datang di sistem absensi SMKN 2 Bandung. <br />
+        Hai <b>{{ ucfirst(session('username')) }}</b>, selamat datang di {{ strtoupper(setting('company_name', 'SMK NEGERI 2 BANDUNG')) }} {{ strtoupper(setting('app_name', 'SMK NEGERI 2 BANDUNG')) }}. <br />
         <small>{{ date('D, d F Y') }}</small>
     </div>
 
@@ -70,20 +70,45 @@
 
     <!-- Location Info -->
     <div class="row mb-3">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title"><i class="fas fa-crosshairs"></i> Koordinat</h6>
-                    <p class="card-text">
-                        <small class="text-muted">Latitude:</small> <span id="current-lat">-</span><br>
-                        <small class="text-muted">Longitude:</small> <span id="current-lng">-</span><br>
-                        <small class="text-muted">Akurasi:</small> <span id="accuracy">-</span> meter
-                    </p>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="fas fa-crosshairs"></i> Koordinat</h6>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Latitude:</small> 
+                    <span id="current-lat" class="font-weight-bold">-</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Longitude:</small> 
+                    <span id="current-lng" class="font-weight-bold">-</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Akurasi:</small> 
+                    <span id="accuracy" class="font-weight-bold">-</span>
                 </div>
             </div>
         </div>
-       
     </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="fas fa-ruler"></i> Jarak</h6>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Dari {{ setting('company_name', 'SMKN 2 Bandung') }}:</small> 
+                    <span id="distance" class="font-weight-bold">-</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Status:</small> 
+                    <span id="location-validation" class="badge badge-secondary">-</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Pembaruan:</small> 
+                    <span id="location-updates" class="font-weight-bold">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Attendance Form -->
     <div class="mb-3 text-center">

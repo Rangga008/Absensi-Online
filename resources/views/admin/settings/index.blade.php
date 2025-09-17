@@ -66,51 +66,51 @@
                         </div>
 
                        <div class="form-group">
-                            <label for="logo">Application Logo</label>
-                            <div class="custom-file">
-                                <input type="file" class="custom-file-input" id="logo" name="logo" accept="image/*">
-                                <label class="custom-file-label" for="logo">Choose file...</label>
-                            </div>
-                            
-                            <!-- Current Logo Preview -->
-                            @php
-                                $logoPath = setting('logo');
-                                $hasValidLogo = $logoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($logoPath);
-                            @endphp
+    <label for="logo">Application Logo</label>
+    <div class="custom-file">
+        <input type="file" class="custom-file-input" id="logo" name="logo" accept="image/*">
+        <label class="custom-file-label" for="logo">Choose file...</label>
+    </div>
+    
+    <!-- Current Logo Preview -->
+    @php
+        $logoPath = setting('logo');
+        $hasValidLogo = $logoPath && File::exists(public_path($logoPath));
+    @endphp
 
-                            @if($hasValidLogo)
-                            <div class="mt-2" id="currentLogoSection">
-                                <small>Current Logo:</small><br>
-                                <img src="{{ asset('storage/' . $logoPath) }}?v={{ time() }}"
-                                    alt="Current Logo" 
-                                    class="img-thumbnail mt-2 current-logo-preview" 
-                                    style="max-height: 100px;"
-                                    onerror="this.style.display='none'; document.getElementById('logoError').style.display='block';">
-                                <div id="logoError" style="display: none;" class="text-danger mt-2">
-                                    <small><i class="fas fa-exclamation-triangle"></i> Logo file not found</small>
-                                </div>
-                            </div>
-                            @else
-                            <div class="mt-2" id="currentLogoSection">
-                                <small class="text-muted">No logo uploaded or default logo will be used</small><br>
-                                <img src="{{ asset('images/logo-smk2.png') }}?v={{ time() }}"
-                                    alt="Default Logo" 
-                                    class="img-thumbnail mt-2" 
-                                    style="max-height: 100px;"
-                                    onerror="this.alt='Default logo not available'">
-                            </div>
-                            @endif
-                            
-                            <!-- New Logo Preview (will show when file is selected) -->
-                            <div id="newLogoPreview" style="display: none;" class="mt-2">
-                                <small>New Logo Preview:</small><br>
-                                <img id="logoPreviewImage" class="img-thumbnail mt-2" style="max-height: 100px;">
-                            </div>
-                            
-                            <small class="form-text text-muted">
-                                Format: PNG, ICO, JPG, JPEG. Max: 2MB. Logo will be used for favicon and branding.
-                            </small>
-                        </div>
+    @if($hasValidLogo)
+    <div class="mt-2" id="currentLogoSection">
+        <small>Current Logo:</small><br>
+        <img src="{{ asset($logoPath) }}?v={{ time() }}"
+            alt="Current Logo" 
+            class="img-thumbnail mt-2 current-logo-preview" 
+            style="max-height: 100px;"
+            onerror="this.style.display='none'; document.getElementById('logoError').style.display='block';">
+        <div id="logoError" style="display: none;" class="text-danger mt-2">
+            <small><i class="fas fa-exclamation-triangle"></i> Logo file not found</small>
+        </div>
+    </div>
+    @else
+    <div class="mt-2" id="currentLogoSection">
+        <small class="text-muted">No logo uploaded or default logo will be used</small><br>
+        <img src="{{ asset('images/logo-smk2.png') }}?v={{ time() }}"
+            alt="Default Logo" 
+            class="img-thumbnail mt-2" 
+            style="max-height: 100px;"
+            onerror="this.alt='Default logo not available'">
+    </div>
+    @endif
+    
+    <!-- New Logo Preview (will show when file is selected) -->
+    <div id="newLogoPreview" style="display: none;" class="mt-2">
+        <small>New Logo Preview:</small><br>
+        <img id="logoPreviewImage" class="img-thumbnail mt-2" style="max-height: 100px;">
+    </div>
+    
+    <small class="form-text text-muted">
+        Format: PNG, ICO, JPG, JPEG. Max: 2MB. Logo will be used for favicon and branding.
+    </small>
+</div>
                     </div>
                     <!-- Attendance Settings -->
                     <div class="col-md-6">
