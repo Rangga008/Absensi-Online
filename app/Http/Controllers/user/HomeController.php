@@ -75,17 +75,20 @@ class HomeController extends Controller
     public function show_history()
 {
     $userId = session('user_id');
-    
-    // Query untuk attendance (kehadiran)
+
+    // Query untuk attendance (kehadiran) dengan informasi checkout
     $attendance = DB::table('attendance')
-        ->select('id', 'present_at', 'description', 'created_at', DB::raw("'hadir' as type"), DB::raw("NULL as status"))
+        ->select('id', 'present_at', 'description', 'created_at', DB::raw("'hadir' as type"), DB::raw("NULL as status"),
+                 'checkout_at', 'checkout_photo_path', 'work_duration_minutes', 'checkout_distance', 'photo_path')
         ->where('user_id', $userId);
-    
+
     // Query untuk concession (izin) dengan status
     $concession = DB::table('concession')
-        ->select('id', 'reason as present_at', 'description', 'created_at', DB::raw("'izin' as type"), 'status')
+        ->select('id', 'reason as present_at', 'description', 'created_at', DB::raw("'izin' as type"), 'status',
+                 DB::raw("NULL as checkout_at"), DB::raw("NULL as checkout_photo_path"),
+                 DB::raw("NULL as work_duration_minutes"), DB::raw("NULL as checkout_distance"), DB::raw("NULL as photo_path"))
         ->where('user_id', $userId);
-    
+
     // Gabungkan kedua query
     $histories = $attendance->union($concession)
         ->orderBy('created_at', 'desc')
@@ -93,6 +96,27 @@ class HomeController extends Controller
         ->get()
         ->map(function ($item) {
             $item->created_at = Carbon::parse($item->created_at);
+            if ($item->checkout_at) {
+                $item->checkout_at = Carbon::parse($item->checkout_at);
+            }
+            // Only parse present_at for attendance records (type 'hadir'), for concession it's the reason
+            if ($item->type === 'hadir' && $item->present_at) {
+                $item->present_at = Carbon::parse($item->present_at);
+            }
+
+            // Calculate work_duration_formatted manually
+            $minutes = $item->work_duration_minutes;
+            if (!$minutes && $item->checkout_at && $item->present_at && $item->type === 'hadir') {
+                $minutes = $item->checkout_at->diffInMinutes($item->present_at);
+            }
+            if ($minutes) {
+                $hours = floor($minutes / 60);
+                $remainingMinutes = $minutes % 60;
+                $item->work_duration_formatted = sprintf('%d jam %d menit', $hours, $remainingMinutes);
+            } else {
+                $item->work_duration_formatted = '0 jam 0 menit';
+            }
+
             return $item;
         });
 

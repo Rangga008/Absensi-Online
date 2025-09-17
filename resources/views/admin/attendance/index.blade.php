@@ -202,6 +202,7 @@
                         <th>Total Attendance</th>
                         <th>Last Attendance</th>
                         <th>Status</th>
+                        <th>Checkout Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -262,6 +263,13 @@
                                     </span>
                                 @else
                                     <span class="badge badge-light">No Record</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($user->latestAttendance && $user->latestAttendance->hasCheckedOut())
+                                    <span class="badge badge-success">Sudah Keluar</span>
+                                @else
+                                    <span class="badge badge-danger">Belum Keluar</span>
                                 @endif
                             </td>
                             <td class="action-buttons">

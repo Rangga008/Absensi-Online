@@ -19,9 +19,14 @@ class AttendanceController extends Controller
      * Show attendance page
      */
     public function index()
-    {
-        return view('user.attendance');
-    }   
+     {
+         return view('user.attendance');
+     }   
+     
+     public function checkout()
+   {
+       return view('user.checkout');
+   }
 
     /**
      * Process attendance submission
@@ -213,9 +218,44 @@ class AttendanceController extends Controller
 
         return response()->json([
             'can_attend' => is_null($attendance),
+            'can_checkout' => $attendance && !$attendance->hasCheckedOut(),
             'attendance' => $attendance ? $this->formatAttendanceData($attendance) : null,
             'server_time' => $this->currentServerTime($timezone),
             'force_check' => true
+        ]);
+    }
+
+     public function checkCheckoutStatus(Request $request)
+    {
+        $request->validate(['user_id' => 'required|exists:users,id']);
+        
+        $timezone = setting('timezone', 'Asia/Jakarta');
+        $today = now($timezone)->format('Y-m-d');
+        
+        $attendance = Attendance::where('user_id', $request->user_id)
+            ->whereDate('present_date', $today)
+            ->first();
+
+       if (!$attendance) {
+            return response()->json([
+                'can_checkout' => false,
+                'message' => 'Anda belum melakukan check-in hari ini',
+                'server_time' => $this->currentServerTime($timezone)
+            ]);
+        }
+        if ($attendance->hasCheckedOut()) {
+            return response()->json([
+                'can_checkout' => false,
+                'message' => 'Anda sudah melakukan checkout pada pukul ' . $attendance->formatted_checkout_time,
+                'attendance' => $this->formatAttendanceData($attendance),
+                'server_time' => $this->currentServerTime($timezone)
+            ]);
+        }
+
+        return response()->json([
+            'can_checkout' => true,
+            'attendance' => $this->formatAttendanceData($attendance),
+           'server_time' => $this->currentServerTime($timezone)
         ]);
     }
 
@@ -408,8 +448,22 @@ class AttendanceController extends Controller
                 'longitude' => $attendance->longitude
             ],
             'distance' => $attendance->distance ? round($attendance->distance) : null,
-            'photo_url' => $attendance->photo_path ? asset('storage/'.$attendance->photo_path) : null
+            'photo_url' => $attendance->photo_path ? asset('storage/'.$attendance->photo_path) : null,
+            'has_checked_out' => $attendance->hasCheckedOut(),
         ];
+         if ($attendance->hasCheckedOut()) {
+            $checkoutTime = Carbon::parse($attendance->checkout_at)->setTimezone($timezone);
+            $data['checkout'] = [
+                'time' => $checkoutTime->format('H:i:s'),
+                'coordinates' => [
+                    'latitude' => $attendance->checkout_latitude,
+                    'longitude' => $attendance->checkout_longitude
+                ],
+                'distance' => $attendance->checkout_distance ? round($attendance->checkout_distance) : null,
+                'photo_url' => $attendance->checkout_photo_path ? asset('storage/'.$attendance->checkout_photo_path) : null,
+                'work_duration' => $attendance->work_duration_formatted
+            ];
+        }
     }
 
     /**
@@ -454,6 +508,192 @@ class AttendanceController extends Controller
         } catch (\Exception $e) {
             Log::error('Error loading user attendances', ['error' => $e->getMessage()]);
             return back()->with('error', 'Error loading attendances: ' . $e->getMessage());
+        }
+    }
+
+    private function checkCanCheckout($userId, $timezone)
+    {
+        $today = now($timezone)->format('Y-m-d');
+        $attendance = Attendance::where('user_id', $userId)
+            ->whereDate('present_date', $today)
+            ->first();
+
+        if (!$attendance) {
+            throw new \Exception('Anda belum melakukan check-in hari ini. Silakan check-in terlebih dahulu.');
+        }
+
+        if ($attendance->hasCheckedOut()) {
+          throw new \Exception('Anda sudah melakukan checkout hari ini pada pukul ' . 
+                                $attendance->checkout_at->format('H:i:s'));
+        }
+       return $attendance;
+   }
+
+    /**
+     * Process checkout submission
+     */
+
+    public function storeCheckout(Request $request)
+    {
+        Log::info('Checkout submission attempt', [
+            'user_id' => $request->get('user_id'),
+            'has_photo' => !empty($request->get('photo')),
+            'latitude' => $request->get('latitude'),
+            'longitude' => $request->get('longitude'),
+      ]);
+       
+       $validated = $request->validate([
+           'user_id' => 'required|exists:users,id',
+           'latitude' => 'required|numeric|between:-90,90',
+           'longitude' => 'required|numeric|between:-180,180',
+            'photo' => 'required|string',
+        ]);
+
+        DB::beginTransaction();
+
+       try {
+           // Get settings from database
+           $officeLat = (float) setting('office_lat', -6.906000);
+            $officeLng = (float) setting('office_lng', 107.623400);
+            $maxDistance = (int) setting('max_distance', 500);
+            $companyName = setting('company_name', 'sekolah');
+            $timezone = setting('timezone', 'Asia/Jakarta');
+
+            // Check if user can checkout today
+            $attendance = $this->checkCanCheckout($validated['user_id'], $timezone);
+
+            // Process checkout photo
+            $checkoutPhotoPath = null;
+            if (!empty($validated['photo'])) {
+                $checkoutPhotoPath = $this->processCheckoutPhoto($validated['photo'], $validated['user_id']);
+            }
+
+            // Calculate distance for checkout
+            $checkoutDistance = $this->calculateDistance(
+                $validated['latitude'],
+                $validated['longitude'],
+                $officeLat,
+                $officeLng
+            );
+
+            $currentTime = now($timezone);
+            
+            // Calculate work duration
+            $workDurationMinutes = $currentTime->diffInMinutes($attendance->present_at);
+
+            Log::info('Work duration calculation', [
+                'attendance_id' => $attendance->id,
+                'present_at' => $attendance->present_at,
+                'current_time' => $currentTime,
+                'work_duration_minutes' => $workDurationMinutes
+            ]);
+
+            // Update attendance record with checkout data
+            $updateData = [
+                'checkout_at' => $currentTime,
+                'checkout_latitude' => $validated['latitude'],
+                'checkout_longitude' => $validated['longitude'],
+                'checkout_photo_path' => $checkoutPhotoPath,
+                'checkout_distance' => $checkoutDistance,
+                'checkout_user_agent' => $request->userAgent(),
+                'checkout_ip_address' => $request->ip(),
+                'work_duration_minutes' => $workDurationMinutes,
+            ];
+
+            $updated = $attendance->update($updateData);
+
+            Log::info('Attendance update result', [
+                'attendance_id' => $attendance->id,
+                'updated' => $updated,
+                'work_duration_minutes_after_update' => $attendance->fresh()->work_duration_minutes
+            ]);
+
+           DB::commit();
+
+           Log::info('Checkout recorded successfully', [
+                'attendance_id' => $attendance->id,
+                'user_id' => $validated['user_id'],
+                'work_duration' => $workDurationMinutes,
+                'checkout_distance' => $checkoutDistance
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checkout berhasil dicatat',
+              'data' => [
+                   'checkout_time' => $attendance->checkout_at->format('H:i:s'),
+                    'date' => $attendance->present_date,
+                   'distance' => round($checkoutDistance),
+                   'work_duration' => $attendance->work_duration_formatted,
+                    'photo_url' => $checkoutPhotoPath ? asset('storage/'.$checkoutPhotoPath) : null
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Checkout error: '.$e->getMessage(), [
+                'user_id' => $validated['user_id'] ?? null,
+                'trace' => $e->getTraceAsString()
+            ]);
+           
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+    private function processCheckoutPhoto($photoData, $userId)
+    {
+        try {
+            // Remove data URL prefix if exists
+            if (strpos($photoData, 'data:image') === 0) {
+                $photoData = preg_replace('#^data:image/\w+;base64,#i', '', $photoData);
+            }
+            
+           $photoData = str_replace(' ', '+', $photoData);
+           $decodedImage = base64_decode($photoData);
+            
+            // Validate image
+            if (!$decodedImage) {
+                throw new \Exception('Invalid base64 image data');
+            }
+            
+            // Test if it's a valid image
+            $imageInfo = @getimagesizefromstring($decodedImage);
+            if (!$imageInfo) {
+                throw new \Exception('Invalid image format');
+            }
+            
+            // Generate unique filename for checkout
+            $imageName = 'checkout_'.time().'_'.$userId.'.jpg';
+            $storagePath = 'attendance-photos/'.$imageName;
+            
+            // Store the image
+            $stored = Storage::disk('public')->put($storagePath, $decodedImage);
+           
+            if (!$stored) {
+               throw new \Exception('Failed to store checkout image');
+            }
+            
+            // Verify the file was actually created
+            if (!Storage::disk('public')->exists($storagePath)) {
+                throw new \Exception('Checkout image file not found after storage');
+           }
+            
+            Log::info('Checkout photo processed successfully', [
+                'path' => $storagePath,
+                'size' => strlen($decodedImage),
+                'user_id' => $userId
+            ]);
+            
+            return $storagePath;            
+        } catch (\Exception $e) {
+            Log::error('Checkout photo processing failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId
+            ]);
+            throw new \Exception('Gagal memproses foto checkout: ' . $e->getMessage());
         }
     }
 }

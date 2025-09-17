@@ -115,7 +115,9 @@
                 <th>Tanggal</th>
                 <th>Waktu</th>
                 <th>Status</th>
-                <th>Lokasi</th>
+                <th>Status Checkout</th>
+                <th>Waktu Checkout</th>
+                <th>Durasi Kerja</th>
                 <th>Jarak</th>
             </tr>
         </thead>
@@ -128,13 +130,9 @@
                 <td>{{ $attendance->present_date }}</td>
                 <td>{{ $attendance->present_at ? $attendance->present_at->format('H:i:s') : '-' }}</td>
                 <td>{{ $attendance->description }}</td>
-                <td>
-                    @if($attendance->latitude && $attendance->longitude)
-                        {{ number_format($attendance->latitude, 6) }}, {{ number_format($attendance->longitude, 6) }}
-                    @else
-                        -
-                    @endif
-                </td>
+                <td>{{ $attendance->hasCheckedOut() ? 'Sudah Keluar' : 'Belum Keluar' }}</td>
+                <td>{{ $attendance->checkout_at ? $attendance->checkout_at->format('H:i:s') : '-' }}</td>
+                <td>{{ $attendance->work_duration_formatted ?: '-' }}</td>
                 <td style="text-align: center;">
                     @if($attendance->distance)
                         {{ number_format($attendance->distance) }} m

@@ -15,16 +15,17 @@
                         </a>
                     </div>
                 </div>
-                
+
                 <div class="card-body">
                     <!-- Photo Section at the Top -->
-                    @if($attendance->photo_path && Storage::disk('public')->exists($attendance->photo_path))
+                    @if(($attendance->photo_path && Storage::disk('public')->exists($attendance->photo_path)) || ($attendance->checkout_photo_path && Storage::disk('public')->exists($attendance->checkout_photo_path)))
                     <div class="row mb-4">
-                        <div class="col-12">
+                        @if($attendance->photo_path && Storage::disk('public')->exists($attendance->photo_path))
+                        <div class="col-md-{{ $attendance->checkout_photo_path && Storage::disk('public')->exists($attendance->checkout_photo_path) ? '6' : '12' }}">
                             <div class="card">
                                 <div class="card-header bg-info text-white">
                                     <h5 class="mb-0">
-                                        <i class="fas fa-camera mr-2"></i>Attendance Photo
+                                        <i class="fas fa-camera mr-2"></i>Check-in Photo
                                     </h5>
                                 </div>
                                 <div class="card-body text-center">
@@ -32,30 +33,68 @@
                                         $imageData = base64_encode(Storage::disk('public')->get($attendance->photo_path));
                                         $src = 'data:image/jpeg;base64,'.$imageData;
                                     @endphp
-                                    
-                                    
+
                                     <div class="photo-container mb-3">
-                                        <img src="{{ $src }}" 
-                                            alt="Attendance Photo" 
-                                            class="img-fluid rounded shadow" 
-                                            style="max-height: 500px; border: 1px solid #ddd;">
+                                        <img src="{{ $src }}"
+                                            alt="Check-in Photo"
+                                            class="img-fluid rounded shadow"
+                                            style="max-height: 400px; border: 1px solid #ddd;">
                                     </div>
-                                    
+
                                     <div class="photo-actions">
                                         <button class="btn btn-primary btn-sm mr-2" onclick="window.open('{{ $src }}', '_blank')">
                                             <i class="fas fa-expand mr-1"></i> Full View
                                         </button>
-                                        <button class="btn btn-info btn-sm" onclick="downloadBase64Image('{{ $src }}', 'attendance_photo_{{ $attendance->id }}.jpg')">
+                                        <button class="btn btn-info btn-sm" onclick="downloadBase64Image('{{ $src }}', 'checkin_photo_{{ $attendance->id }}.jpg')">
                                             <i class="fas fa-download mr-1"></i> Download
                                         </button>
                                     </div>
-                                    
+
                                     <div class="mt-2 text-muted small">
                                         <i class="fas fa-info-circle"></i> Photo taken at {{ $attendance->present_at->format('H:i:s') }}
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        @endif
+
+                        @if($attendance->checkout_photo_path && Storage::disk('public')->exists($attendance->checkout_photo_path))
+                        <div class="col-md-{{ $attendance->photo_path && Storage::disk('public')->exists($attendance->photo_path) ? '6' : '12' }}">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-camera mr-2"></i>Check-out Photo
+                                    </h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    @php
+                                        $checkoutImageData = base64_encode(Storage::disk('public')->get($attendance->checkout_photo_path));
+                                        $checkoutSrc = 'data:image/jpeg;base64,'.$checkoutImageData;
+                                    @endphp
+
+                                    <div class="photo-container mb-3">
+                                        <img src="{{ $checkoutSrc }}"
+                                            alt="Check-out Photo"
+                                            class="img-fluid rounded shadow"
+                                            style="max-height: 400px; border: 1px solid #ddd;">
+                                    </div>
+
+                                    <div class="photo-actions">
+                                        <button class="btn btn-primary btn-sm mr-2" onclick="window.open('{{ $checkoutSrc }}', '_blank')">
+                                            <i class="fas fa-expand mr-1"></i> Full View
+                                        </button>
+                                        <button class="btn btn-info btn-sm" onclick="downloadBase64Image('{{ $checkoutSrc }}', 'checkout_photo_{{ $attendance->id }}.jpg')">
+                                            <i class="fas fa-download mr-1"></i> Download
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-2 text-muted small">
+                                        <i class="fas fa-info-circle"></i> Photo taken at {{ $attendance->checkout_at->format('H:i:s') }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                     @endif
 
@@ -72,7 +111,7 @@
                                                 <th width="30%">User</th>
                                                 <td>
                                                     <div class="d-flex align-items-center">
-                                                        <div class="avatar bg-primary text-white rounded-circle mr-2" 
+                                                        <div class="avatar bg-primary text-white rounded-circle mr-2"
                                                             style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
                                                             {{ substr($attendance->user->name, 0, 1) }}
                                                         </div>
@@ -83,7 +122,7 @@
                                                     </div>
                                                 </td>
                                             </tr>
-                                            
+
                                             <tr>
                                                 <th>Date & Time</th>
                                                 <td>
@@ -170,8 +209,67 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-4">
+                            <!-- Checkout Information Section -->
+                            @if($attendance->hasCheckedOut())
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h4 class="card-title mb-0">
+                                        <i class="fas fa-sign-out-alt mr-2"></i>Checkout Information
+                                    </h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped">
+                                            <tr>
+                                                <th width="40%">Checkout Time</th>
+                                                <td>{{ $attendance->checkout_at->translatedFormat('l, d F Y') }}<br>
+                                                    <span class="text-muted">{{ $attendance->checkout_at->format('H:i:s') }}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th>Work Duration</th>
+                                                <td>{{ $attendance->work_duration_formatted ?: 'N/A' }}</td>
+                                            </tr>
+                                            @if($attendance->checkout_latitude && $attendance->checkout_longitude)
+                                            <tr>
+                                                <th>Checkout Location</th>
+                                                <td>
+                                                    <small class="text-muted">Lat:</small> {{ number_format($attendance->checkout_latitude, 6) }}<br>
+                                                    <small class="text-muted">Lng:</small> {{ number_format($attendance->checkout_longitude, 6) }}
+                                                </td>
+                                            </tr>
+                                            @endif
+                                            @if($attendance->checkout_distance)
+                                            <tr>
+                                                <th>Checkout Distance</th>
+                                                <td>
+                                                    @php
+                                                        $maxDistance = setting('max_distance', 500);
+                                                        $companyName = setting('company_name', 'sekolah');
+                                                    @endphp
+                                                    @if($attendance->checkout_distance <= $maxDistance)
+                                                        <span class="badge badge-success">
+                                                            {{ $attendance->checkout_distance }} meters
+                                                        </span>
+                                                    @else
+                                                        <span class="badge badge-danger">
+                                                            {{ $attendance->checkout_distance }} meters
+                                                        </span>
+                                                        <div class="text-danger small mt-1">
+                                                            (Outside {{ $maxDistance }}m radius from {{ $companyName }})
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                            @endif
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            @endif
+
                             <div class="card mb-4">
                                 <div class="card-header bg-success text-white">
                                     <h4 class="card-title mb-0">
@@ -191,8 +289,8 @@
                                                     <span class="badge badge-primary mr-2">●</span>
                                                     <small>Attendance Location</small>
                                                 </div>
-                                                <a href="https://www.google.com/maps?q={{ $attendance->latitude }},{{ $attendance->longitude }}" 
-                                                target="_blank" 
+                                                <a href="https://www.google.com/maps?q={{ $attendance->latitude }},{{ $attendance->longitude }}"
+                                                target="_blank"
                                                 class="btn btn-sm btn-outline-success">
                                                     <i class="fas fa-external-link-alt mr-1"></i> Google Maps
                                                 </a>
@@ -206,7 +304,7 @@
                                     @endif
                                 </div>
                             </div>
-                            
+
                             <div class="card">
                                 <div class="card-header bg-warning text-dark">
                                     <h4 class="card-title mb-0">
@@ -238,25 +336,61 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                
+
+                   
+
                 <div class="card-footer bg-light">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <a href="{{ route('admin.attendances.edit', $attendance->id) }}" 
+                            <a href="{{ route('admin.attendances.edit', $attendance->id) }}"
                             class="btn btn-warning">
                                 <i class="fas fa-edit mr-1"></i> Edit Record
                             </a>
                         </div>
                         <div>
-                            <form action="{{ route('admin.attendances.destroy', $attendance->id) }}" 
-                                method="POST" 
+                            <form action="{{ route('admin.attendances.destroy', $attendance->id) }}"
+                                method="POST"
                                 onsubmit="return confirm('Are you sure you want to delete this attendance record? This action cannot be undone.')">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger">
                                     <i class="fas fa-trash-alt mr-1"></i> Delete
                                 </button>
+                            </form>
+                        </div>
+                        <div>
+                            @if(!$attendance->hasCheckedOut())
+                            <button class="btn btn-success" data-toggle="collapse" data-target="#checkoutForm" aria-expanded="false" aria-controls="checkoutForm">
+                                <i class="fas fa-sign-out-alt mr-1"></i> Checkout
+                            </button>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="collapse mt-3" id="checkoutForm">
+                        <div class="card card-body">
+                            <form action="{{ route('admin.attendances.checkout', $attendance->id) }}" method="POST" enctype="multipart/form-data">
+                                @csrf
+                                <div class="form-group">
+                                    <label for="checkout_at">Checkout Date</label>
+                                    <input type="date" class="form-control" id="checkout_at" name="checkout_at" value="{{ now()->format('Y-m-d') }}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="checkout_time">Checkout Time</label>
+                                    <input type="time" class="form-control" id="checkout_time" name="checkout_time" value="{{ now()->format('H:i') }}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="checkout_latitude">Checkout Latitude</label>
+                                    <input type="text" class="form-control" id="checkout_latitude" name="checkout_latitude" value="{{ old('checkout_latitude') }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="checkout_longitude">Checkout Longitude</label>
+                                    <input type="text" class="form-control" id="checkout_longitude" name="checkout_longitude" value="{{ old('checkout_longitude') }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="checkout_photo">Checkout Photo (Base64)</label>
+                                    <textarea class="form-control" id="checkout_photo" name="checkout_photo" rows="3">{{ old('checkout_photo') }}</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Submit Checkout</button>
                             </form>
                         </div>
                     </div>
@@ -278,10 +412,10 @@
         const officeLng = {{ setting('office_lng', 107.623400) }};
         const maxDistance = {{ setting('max_distance', 500) }};
         const companyName = "{{ setting('company_name', 'SMKN 2 Bandung') }}";
-        
+
         const attendanceLat = {{ $attendance->latitude }};
         const attendanceLng = {{ $attendance->longitude }};
-        
+
         // Initialize map
         const map = L.map('map').setView([
             (officeLat + attendanceLat) / 2,
@@ -294,11 +428,11 @@
 
         // Office marker with custom icon
         const officeIcon = L.divIcon({
-            html: '<div style="background-color: #e63946; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: white;"><i class="fas fa-building"></i></div>',
+            html: '<div style="background-color: #e63946; border-radius: 50%; width: 24px; height: 24px; display: flex: align-items: center; justify-content: center; color: white;"><i class="fas fa-building"></i></div>',
             iconSize: [24, 24],
             className: 'custom-div-icon'
         });
-        
+
         const officeMarker = L.marker([officeLat, officeLng], {
             icon: officeIcon
         }).addTo(map).bindPopup(`
@@ -312,7 +446,7 @@
             iconSize: [24, 24],
             className: 'custom-div-icon'
         });
-        
+
         const userMarker = L.marker([attendanceLat, attendanceLng], {
             icon: userIcon
         }).addTo(map).bindPopup(`
@@ -344,7 +478,7 @@
             lat: (officeLat + attendanceLat) / 2,
             lng: (officeLng + attendanceLng) / 2
         };
-        
+
         L.marker(midpoint, {
             icon: L.divIcon({
                 html: `<div style="background: white; padding: 2px 6px; border-radius: 10px; border: 1px solid #6c757d; font-weight: bold;">${distance}m</div>`,

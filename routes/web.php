@@ -34,9 +34,11 @@ Route::prefix('user')->middleware(['check.user.session'])->group(function () {
     Route::get('/history', [HomeController::class, 'show_history'])->name('user.history');
     Route::get('/attendance', [UserAttendanceController::class, 'index'])->name('user.attendance');
     Route::post('/do-attendance', [UserAttendanceController::class, 'store'])->name('user.do_attendance');
+    Route::get('/checkout', [UserAttendanceController::class, 'checkout'])->name('user.checkout');
+    Route::post('/do-attendance', [UserAttendanceController::class, 'store'])->name('user.do_attendance');
     Route::get('/concession', [ConcessionController::class, 'createForUser'])->name('user.concession.create');
     Route::post('/concession', [ConcessionController::class, 'storeForUser'])->name('user.concession.store');
-    Route::get('/concession/history', [ConcessionController::class, 'userHistory'])->name('user.concession.history');
+    Route::get('/concession/history', [ConcessionController::class, 'userHistory'])->name('user.concession.history');   
     
 });
 
@@ -133,6 +135,7 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         'update' => 'admin.attendances.update',
         'destroy' => 'admin.attendances.destroy'
     ]);
+    Route::post('attendances/{id}/checkout', [AttendanceController::class, 'checkout'])->name('admin.attendances.checkout');
 
     // User-specific attendances
     Route::get('users/{user}/attendances', [AttendanceController::class, 'userAttendances'])
@@ -168,6 +171,10 @@ Route::prefix('api')->group(function () {
         ->name('attendance.stats');
     Route::post('/attendance', [UserAttendanceController::class, 'store'])
         ->name('attendance.store');
+        Route::post('/checkout', [UserAttendanceController::class, 'storeCheckout'])
+        ->name('checkout.store');
+    Route::post('/checkout/status', [UserAttendanceController::class, 'checkCheckoutStatus'])
+        ->name('checkout.check-status');
 });
 
 // Export form and process routes

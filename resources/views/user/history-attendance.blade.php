@@ -105,21 +105,52 @@
                                                 </div>
                                                 <div class="text-right">
                                                     @if($history->description)
-                                                        <button class="btn btn-sm btn-outline-primary" data-toggle="collapse" 
+                                                        <button class="btn btn-sm btn-outline-primary" data-toggle="collapse"
                                                                 data-target="#detail-{{ $history->id }}" aria-expanded="false">
                                                             <i class="fas fa-info-circle"></i> Detail
+                                                        </button>
+                                                    @endif
+                                                    @if($history->checkout_at)
+                                                        <button class="btn btn-sm btn-outline-success ml-1" data-toggle="collapse"
+                                                                data-target="#checkout-detail-{{ $history->id }}" aria-expanded="false">
+                                                            <i class="fas fa-sign-out-alt"></i> Checkout
                                                         </button>
                                                     @endif
                                                 </div>
                                             </div>
                                             
-                                            @if($history->description)
+                                            @if($history->description || $history->photo_path)
                                                 <div class="collapse mt-3" id="detail-{{ $history->id }}">
                                                     <div class="detail-card p-3 bg-light rounded">
+                                                        @if($history->description)
+                                                            <h6 class="text-primary mb-2">
+                                                                <i class="fas fa-sticky-note mr-1"></i>Keterangan
+                                                            </h6>
+                                                            <p class="mb-0 text-dark">{{ $history->description }}</p>
+                                                        @endif
+                                                        @if($history->photo_path)
+                                                            <h6 class="text-primary mb-2 mt-3">
+                                                                <i class="fas fa-camera mr-1"></i>Foto Absensi
+                                                            </h6>
+                                                            <img src="{{ asset('storage/' . $history->photo_path) }}" alt="Foto Absensi" class="img-fluid rounded" style="max-width: 200px;">
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            @if($history->checkout_at)
+                                                <div class="collapse mt-3" id="checkout-detail-{{ $history->id }}">
+                                                    <div class="detail-card p-3 bg-light rounded">
                                                         <h6 class="text-primary mb-2">
-                                                            <i class="fas fa-sticky-note mr-1"></i>Keterangan
+                                                            <i class="fas fa-sign-out-alt mr-1"></i>Checkout
                                                         </h6>
-                                                        <p class="mb-0 text-dark">{{ $history->description }}</p>
+                                                        <p class="mb-0 text-dark">
+                                                            Waktu Checkout: {{ $history->checkout_at->format('H:i') }} WIB<br>
+                                                            Durasi Kerja: {{ $history->work_duration_formatted ?: '0 jam 0 menit' }}<br>
+                                                            Jarak Checkout: {{ $history->checkout_distance ? round($history->checkout_distance) : '-' }} meter
+                                                        </p>
+                                                        @if($history->checkout_photo_path)
+                                                            <img src="{{ asset('storage/' . $history->checkout_photo_path) }}" alt="Foto Checkout" class="img-fluid rounded mt-2" style="max-width: 200px;">
+                                                        @endif
                                                     </div>
                                                 </div>
                                             @endif

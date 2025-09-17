@@ -39,6 +39,7 @@
                             <th>Time</th>
                             <th>Status</th>
                             <th>Actions</th>
+                            <th>Checkout</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,6 +73,15 @@
                                 class="btn btn-sm btn-warning">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                            </td>
+                            <td>
+                                @if($attendance->hasCheckedOut())
+                                    <span class="badge badge-success">Sudah Keluar</span><br>
+                                    <small>Checkout: {{ $attendance->formatted_checkout_time }}</small><br>
+                                    <small>Durasi Kerja: {{ $attendance->work_duration_formatted ?: 'N/A' }}</small>
+                                @else
+                                    <span class="badge badge-danger">Belum Keluar</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach

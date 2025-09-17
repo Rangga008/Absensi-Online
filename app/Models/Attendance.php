@@ -24,14 +24,26 @@ class Attendance extends Model
         'distance',
         'present_date',
         'present_at',
+        'checkout_at',
+        'checkout_latitude',
+        'checkout_longitude',
+        'checkout_photo_path',
+        'checkout_distance',
+       'checkout_user_agent',        'checkout_ip_address',
+       'work_duration_minutes',
     ];
 
     protected $casts = [
         'present_at' => 'datetime',
+        'checkout_at' => 'datetime',
         'present_date' => 'date',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
+        'checkout_latitude' => 'decimal:7',
+        'checkout_longitude' => 'decimal:7',
         'distance' => 'decimal:2',
+        'checkout_distance' => 'decimal:2',
+       'work_duration_minutes' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -40,6 +52,7 @@ class Attendance extends Model
     protected $dates = [
         'present_at',
         'present_date',
+        'checkout_at',
         'created_at',
         'updated_at',
         'deleted_at',
@@ -59,6 +72,40 @@ class Attendance extends Model
     public function scopeToday($query)
     {
         return $query->whereDate('present_date', now('Asia/Jakarta')->format('Y-m-d'));
+    }
+
+    public function getCheckoutPhotoUrlAttribute()
+    {
+        return $this->checkout_photo_path ? asset('storage/' . $this->checkout_photo_path) : null;
+    }
+
+    public function getFormattedCheckoutTimeAttribute()
+    {
+        return $this->checkout_at ? $this->checkout_at->setTimezone('Asia/Jakarta')->format('H:i:s') : null;
+    }
+
+    public function hasCheckedOut()
+    {
+        return !is_null($this->checkout_at);
+    }
+
+    public function getWorkDurationFormattedAttribute()
+    {
+        $minutes = $this->work_duration_minutes;
+
+        // If not set, calculate from present_at to checkout_at
+        if (!$minutes && $this->checkout_at && $this->present_at) {
+            $minutes = $this->checkout_at->diffInMinutes($this->present_at);
+        }
+
+        if (!$minutes) {
+            return '0 jam 0 menit';
+        }
+
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        return sprintf('%d jam %d menit', $hours, $remainingMinutes);
     }
 
     /**

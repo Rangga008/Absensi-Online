@@ -3,12 +3,12 @@
 @section('content')
 <!-- Outer Row -->
 <div class="row justify-content-center min-vh-100 align-items-center">
-    <div class="card o-hidden border-0 shadow-lg my-5" style="width: 500px; border-radius: 20px;">
+    <div class="card o-hidden border-0 shadow-lg my-5" style="border-radius: 20px; max-width: 500px; width: 100%; margin: 0 auto;">
         <div class="card-body p-0">
             <!-- Nested Row within Card Body -->
             <div class="row">
                 <div class="col-lg-12">
-                    <div class="p-5">
+                    <div class="p-4 p-md-5">
                         <!-- Back Button -->
                         <a href="/" class="btn btn-circle btn-light" style="position: absolute; top: 20px; left: 20px;">
                             <i class="fas fa-arrow-left text-success"></i>
@@ -57,7 +57,7 @@
                             <div class="form-group">
                                 <div class="input-group">
                                     <span class="input-group-text bg-transparent border-right-0"><i class="fas fa-lock text-success"></i></span>
-                                    <input type="password" class="form-control form-control-user" name="password" placeholder="Password" style="border-radius: 0 50px 50px 0;">
+                                    <input type="password" class="form-control form-control-user" name="password" placeholder="Password" autocomplete="off" style="border-radius: 0 50px 50px 0;">
                                 </div>
                                 @error('password')
                                 <small class="text-danger ml-3">{{ $message }}</small>
@@ -81,11 +81,57 @@
     </div>
 </div>
 
+<style>
+@media (max-width: 576px) {
+    .card {
+        margin: 0 15px !important;
+        max-width: none !important;
+    }
+
+    .p-4 {
+        padding: 1.5rem !important;
+    }
+
+    .btn-circle {
+        width: 30px !important;
+        height: 30px !important;
+        top: 10px !important;
+        left: 10px !important;
+    }
+
+    .btn-circle i {
+        font-size: 0.8rem;
+    }
+
+    .clock {
+        font-size: 1rem !important;
+    }
+
+    .date {
+        font-size: 0.8rem !important;
+    }
+
+    .form-control-user {
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+}
+
+@media (max-width: 768px) {
+    .card {
+        margin: 0 20px !important;
+    }
+
+    .p-md-5 {
+        padding: 2rem !important;
+    }
+}
+</style>
+
 @push('scripts')
 <script>
     function updateTime() {
         const now = new Date();
-        
+
         // Format time
         const timeOptions = {
             hour: '2-digit',
@@ -94,7 +140,7 @@
             hour12: false
         };
         const timeString = now.toLocaleTimeString('id-ID', timeOptions);
-        
+
         // Format date
         const dateOptions = {
             weekday: 'long',
@@ -103,11 +149,11 @@
             day: 'numeric'
         };
         const dateString = now.toLocaleDateString('id-ID', dateOptions);
-        
+
         document.getElementById('clock').textContent = timeString;
         document.getElementById('date').textContent = dateString;
     }
-    
+
     // Update time immediately and then every second
     updateTime();
     setInterval(updateTime, 1000);
