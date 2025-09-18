@@ -1217,4 +1217,24 @@ public function processExport(Request $request)
         }
     }
 
+    /**
+     * Handle export request (GET and POST)
+     */
+    public function export(Request $request)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        if ($request->isMethod('get')) {
+            // Show export form
+            return $this->showExportForm();
+        } elseif ($request->isMethod('post')) {
+            // Process export
+            return $this->processExport($request);
+        }
+
+        return redirect()->route('admin.attendances.export.form');
+    }
+
 }

@@ -176,6 +176,19 @@
 </head>
 <body>
     <div class="header">
+        @php
+            $kopsuratPath = setting('kopsurat');
+            $hasValidKopsurat = $kopsuratPath && File::exists(public_path($kopsuratPath));
+        @endphp
+
+        @if($hasValidKopsurat)
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="data:image/jpeg;base64,{{ base64_encode(File::get(public_path($kopsuratPath))) }}"
+                 alt="Kopsurat"
+                 style="max-width: 100%; max-height: 120px; object-fit: contain;">
+        </div>
+        @endif
+
         <div class="company-info">
             {{ setting('company_name', 'SMKN 2 Bandung') }}
         </div>

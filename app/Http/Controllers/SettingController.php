@@ -27,6 +27,7 @@ class SettingController extends Controller
             'work_end_time' => setting('work_end_time', '16:00'),
             'late_threshold' => setting('late_threshold', '08:00'),
             'logo' => setting('logo', null),
+            'kopsurat' => setting('kopsurat', null), // Added kopsurat setting
         ];
 
         return view('admin.settings.index', compact('settings'));
@@ -49,69 +50,99 @@ class SettingController extends Controller
             'work_end_time' => 'required|date_format:H:i',
             'late_threshold' => 'required|date_format:H:i',
             'logo' => 'nullable|image|mimes:png,ico,jpg,jpeg|max:2048',
+            'kopsurat' => 'nullable|image|mimes:png,ico,jpg,jpeg|max:2048', // Added validation for kopsurat
         ]);
 
         try {
             $logoUpdated = false;
-            
+            $kopsuratUpdated = false;
+
             // Handle logo upload
             if ($request->hasFile('logo')) {
                 $file = $request->file('logo');
-                
+
                 if (!$file->isValid()) {
                     return back()->with('error', 'File logo tidak valid')->withInput();
                 }
 
-                // Get old logo path before uploading new one
                 $oldLogo = setting('logo');
-                
-                // Generate unique filename
+
                 $fileName = 'logo-' . time() . '.' . $file->getClientOriginalExtension();
-                
-                // Create directory if not exists
+
                 $logoDir = public_path('uploads/settings');
                 if (!File::exists($logoDir)) {
                     File::makeDirectory($logoDir, 0755, true);
                 }
-                
-                // Store file in public/uploads/settings directory
+
                 $file->move($logoDir, $fileName);
                 $logoPath = 'uploads/settings/' . $fileName;
 
-                // Verify file was actually stored
                 if (!File::exists(public_path($logoPath))) {
                     throw new \Exception('File logo tidak ditemukan setelah upload');
                 }
 
-                // Save logo path to database
                 Log::info('Saving new logo path: ' . $logoPath);
                 Setting::setValue('logo', $logoPath);
                 $logoUpdated = true;
 
-                // Delete old logo if exists and different from new one
                 if ($oldLogo && $oldLogo !== $logoPath && File::exists(public_path($oldLogo))) {
                     File::delete(public_path($oldLogo));
                     Log::info('Deleted old logo: ' . $oldLogo);
                 }
             }
 
+            // Handle kopsurat upload
+            if ($request->hasFile('kopsurat')) {
+                $file = $request->file('kopsurat');
+
+                if (!$file->isValid()) {
+                    return back()->with('error', 'File kopsurat tidak valid')->withInput();
+                }
+
+                $oldKopsurat = setting('kopsurat');
+
+                $fileName = 'kopsurat-' . time() . '.' . $file->getClientOriginalExtension();
+
+                $kopsuratDir = public_path('uploads/settings');
+                if (!File::exists($kopsuratDir)) {
+                    File::makeDirectory($kopsuratDir, 0755, true);
+                }
+
+                $file->move($kopsuratDir, $fileName);
+                $kopsuratPath = 'uploads/settings/' . $fileName;
+
+                if (!File::exists(public_path($kopsuratPath))) {
+                    throw new \Exception('File kopsurat tidak ditemukan setelah upload');
+                }
+
+                Log::info('Saving new kopsurat path: ' . $kopsuratPath);
+                Setting::setValue('kopsurat', $kopsuratPath);
+                $kopsuratUpdated = true;
+
+                if ($oldKopsurat && $oldKopsurat !== $kopsuratPath && File::exists(public_path($oldKopsurat))) {
+                    File::delete(public_path($oldKopsurat));
+                    Log::info('Deleted old kopsurat: ' . $oldKopsurat);
+                }
+            }
+
             // Save other settings
             foreach ($validated as $key => $value) {
-                if ($key !== 'logo') {
+                if ($key !== 'logo' && $key !== 'kopsurat') {
                     Setting::setValue($key, $value);
                 }
             }
 
-            // Clear all settings cache to force refresh
             Cache::flush();
-            
-            // Also clear specific cache keys
             Cache::forget('setting_logo');
+            Cache::forget('setting_kopsurat');
             Cache::forget('settings');
-            
+
             $message = 'Pengaturan berhasil diperbarui!';
             if ($logoUpdated) {
                 $message .= ' Logo baru telah diupload dan akan diterapkan.';
+            }
+            if ($kopsuratUpdated) {
+                $message .= ' Kopsurat baru telah diupload dan akan diterapkan.';
             }
 
             return redirect()->route('admin.settings.index')

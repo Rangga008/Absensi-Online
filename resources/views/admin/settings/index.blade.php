@@ -110,6 +110,47 @@
     <small class="form-text text-muted">
         Format: PNG, ICO, JPG, JPEG. Max: 2MB. Logo will be used for favicon and branding.
     </small>
+
+<!-- Kopsurat Upload -->
+<div class="form-group mt-4">
+    <label for="kopsurat">Kopsurat (Letterhead) Image</label>
+    <div class="custom-file">
+        <input type="file" class="custom-file-input" id="kopsurat" name="kopsurat" accept="image/*">
+        <label class="custom-file-label" for="kopsurat">Choose file...</label>
+    </div>
+
+    @php
+        $kopsuratPath = setting('kopsurat');
+        $hasValidKopsurat = $kopsuratPath && File::exists(public_path($kopsuratPath));
+    @endphp
+
+    @if($hasValidKopsurat)
+    <div class="mt-2" id="currentKopsuratSection">
+        <small>Current Kopsurat:</small><br>
+        <img src="{{ asset($kopsuratPath) }}?v={{ time() }}"
+            alt="Current Kopsurat" 
+            class="img-thumbnail mt-2 current-kopsurat-preview" 
+            style="max-height: 150px;"
+            onerror="this.style.display='none'; document.getElementById('kopsuratError').style.display='block';">
+        <div id="kopsuratError" style="display: none;" class="text-danger mt-2">
+            <small><i class="fas fa-exclamation-triangle"></i> Kopsurat file not found</small>
+        </div>
+    </div>
+    @else
+    <div class="mt-2" id="currentKopsuratSection">
+        <small class="text-muted">No kopsurat uploaded</small>
+    </div>
+    @endif
+
+    <!-- New Kopsurat Preview (will show when file is selected) -->
+    <div id="newKopsuratPreview" style="display: none;" class="mt-2">
+        <small>New Kopsurat Preview:</small><br>
+        <img id="kopsuratPreviewImage" class="img-thumbnail mt-2" style="max-height: 150px;">
+    </div>
+
+    <small class="form-text text-muted">
+        Format: PNG, ICO, JPG, JPEG. Max: 2MB. Kopsurat will be displayed on attendance export PDFs.
+    </small>
 </div>
                     </div>
                     <!-- Attendance Settings -->
@@ -252,54 +293,58 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeMaps();
 });
 
-// File input handler
+// File input handler for logo and kopsurat
 document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('logo');
-    const fileLabel = document.querySelector('.custom-file-label');
-    const newLogoPreview = document.getElementById('newLogoPreview');
-    const logoPreviewImage = document.getElementById('logoPreviewImage');
-    
-    if (fileInput && fileLabel) {
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            
-            if (file) {
-                const fileName = file.name;
-                fileLabel.textContent = fileName;
-                
-                // Validate file type
-                const allowedTypes = ['image/png', 'image/x-icon', 'image/jpeg', 'image/jpg'];
-                if (!allowedTypes.includes(file.type)) {
-                    alert('Please select a valid image file (PNG, ICO, JPG, JPEG)');
-                    fileInput.value = '';
+    function setupFileInput(inputId, previewId, labelSelector) {
+        const fileInput = document.getElementById(inputId);
+        const fileLabel = document.querySelector(labelSelector);
+        const newPreview = document.getElementById(previewId);
+        const previewImage = newPreview ? newPreview.querySelector('img') || newPreview.querySelector('img') : null;
+
+        if (fileInput && fileLabel) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+
+                if (file) {
+                    const fileName = file.name;
+                    fileLabel.textContent = fileName;
+
+                    const allowedTypes = ['image/png', 'image/x-icon', 'image/jpeg', 'image/jpg'];
+                    if (!allowedTypes.includes(file.type)) {
+                        alert('Please select a valid image file (PNG, ICO, JPG, JPEG)');
+                        fileInput.value = '';
+                        fileLabel.textContent = 'Choose file...';
+                        if (newPreview) newPreview.style.display = 'none';
+                        return;
+                    }
+
+                    if (file.size > 2 * 1024 * 1024) {
+                        alert('File size must be less than 2MB');
+                        fileInput.value = '';
+                        fileLabel.textContent = 'Choose file...';
+                        if (newPreview) newPreview.style.display = 'none';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        if (previewImage) {
+                            previewImage.src = e.target.result;
+                        }
+                        if (newPreview) newPreview.style.display = 'block';
+                    }
+                    reader.readAsDataURL(file);
+
+                } else {
                     fileLabel.textContent = 'Choose file...';
-                    newLogoPreview.style.display = 'none';
-                    return;
+                    if (newPreview) newPreview.style.display = 'none';
                 }
-                
-                // Validate file size (2MB)
-                if (file.size > 2 * 1024 * 1024) {
-                    alert('File size must be less than 2MB');
-                    fileInput.value = '';
-                    fileLabel.textContent = 'Choose file...';
-                    newLogoPreview.style.display = 'none';
-                    return;
-                }
-                
-                // Show preview
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    logoPreviewImage.src = e.target.result;
-                    newLogoPreview.style.display = 'block';
-                }
-                reader.readAsDataURL(file);
-                
-            } else {
-                fileLabel.textContent = 'Choose file...';
-                newLogoPreview.style.display = 'none';
-            }
-        });
+            });
+        }
     }
+
+    setupFileInput('logo', 'newLogoPreview', '.custom-file-label[for="logo"]');
+    setupFileInput('kopsurat', 'newKopsuratPreview', '.custom-file-label[for="kopsurat"]');
 });
 
 // Form submission handler to show loading state
