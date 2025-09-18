@@ -12,6 +12,9 @@
             <a href="{{ route('admin.concessions.index') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left mr-1"></i> Kembali
             </a>
+            <a href="{{ route('admin.concessions.exportPdf', $concession->id) }}" class="btn btn-primary ml-2" target="_blank">
+                <i class="fas fa-file-pdf mr-1"></i> Export PDF
+            </a>
         </div>
     </div>
 

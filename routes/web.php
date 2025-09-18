@@ -157,7 +157,7 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         ->name('admin.attendances.exportUserExcel');
 
     // Concessions
-     Route::resource('concessions', ConcessionController::class)->names([
+    Route::resource('concessions', ConcessionController::class)->names([
         'index' => 'admin.concessions.index',
         'create' => 'admin.concessions.create',
         'store' => 'admin.concessions.store',
@@ -166,6 +166,10 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         'update' => 'admin.concessions.update',
         'destroy' => 'admin.concessions.destroy'
     ]);
+
+    // Export PDF route for concession
+    Route::get('concessions/{id}/export-pdf', [ConcessionController::class, 'exportPdf'])
+        ->name('admin.concessions.exportPdf');
 
     // Tambahkan routes untuk approve/reject
     Route::post('concessions/{id}/approve', [ConcessionController::class, 'approve'])

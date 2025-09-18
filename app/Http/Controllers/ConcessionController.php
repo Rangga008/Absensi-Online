@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ConcessionController extends Controller
 {
@@ -355,6 +357,29 @@ class ConcessionController extends Controller
             DB::rollBack();
             Log::error('Error rejecting concession: '.$e->getMessage(), ['id' => $id]);
             return back()->with('error', 'Gagal menolak pengajuan izin');
+        }
+    }
+
+    /**
+     * Export concession to PDF with kopsurat
+     */
+    public function exportPdf($id)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $concession = Concession::with(['user', 'approver'])->findOrFail($id);
+
+            $pdf = Pdf::loadView('admin.concession.export_pdf', compact('concession'));
+            $filename = 'pengajuan-izin-' . $concession->user->name . '-' . $concession->id . '.pdf';
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting concession to PDF: '.$e->getMessage(), ['id' => $id]);
+            return back()->with('error', 'Gagal mengekspor pengajuan izin ke PDF');
         }
     }
 }
