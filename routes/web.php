@@ -79,6 +79,9 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
     Route::get('users/import/template', [UserController::class, 'downloadTemplate'])
         ->name('admin.users.import.template');
 
+    Route::delete('users/bulk-delete', [UserController::class, 'bulkDestroy'])
+        ->name('admin.users.bulk-delete');
+
     Route::resource('users', UserController::class)->names([
         'index' => 'admin.users.index',
         'create' => 'admin.users.create',
@@ -137,6 +140,12 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
     ]);
     Route::post('attendances/{id}/checkout', [AttendanceController::class, 'checkout'])->name('admin.attendances.checkout');
 
+    // Single attendance export routes
+    Route::get('attendances/{id}/export-pdf', [AttendanceController::class, 'exportSinglePdf'])
+        ->name('admin.attendances.exportSinglePdf');
+    Route::get('attendances/{id}/export-excel', [AttendanceController::class, 'exportSingleExcel'])
+        ->name('admin.attendances.exportSingleExcel');
+
     // User-specific attendances
     Route::get('users/{user}/attendances', [AttendanceController::class, 'userAttendances'])
         ->name('admin.users.attendances');
@@ -163,6 +172,9 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
          ->name('admin.concessions.approve');
     Route::post('concessions/{id}/reject', [ConcessionController::class, 'reject'])
          ->name('admin.concessions.reject');
+    Route::delete('admin/users/bulk-delete', [UserController::class, 'bulkDelete'])->name('admin.users.bulk-delete');
+
+    
 });
 /** Route untuk AJAX requests */
 Route::prefix('api')->group(function () {

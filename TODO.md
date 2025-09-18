@@ -1,22 +1,12 @@
-# TODO List for Attendance PDF Export Update
+# Fix Delete Selected User Feature and Display
 
-## Completed Tasks
-- [x] Update export_pdf.blade.php to Indonesian language
-- [x] Remove longitude and latitude columns from export_pdf.blade.php
-- [x] Change "Checkout Status" to "Status Checkout" and "Checkout Time" to "Waktu Checkout" in export_pdf.blade.php
-- [x] Make the layout neater by adjusting table structure
-- [x] Update export_user_pdf.blade.php to Indonesian language
-- [x] Remove Latitude and Longitude columns from export_user_pdf.blade.php
-- [x] Change English labels to Indonesian in export_user_pdf.blade.php
-- [x] Adjust colspan in empty table row for export_user_pdf.blade.php
-
-## Pending Tasks
-- [ ] Test the PDF export functionality to ensure it works correctly
-- [ ] Verify that the generated PDF displays in Indonesian and excludes lat/long
-- [ ] Confirm the layout is neat and readable
+## Tasks
+- [ ] Update select-all checkbox in table header to use proper Bootstrap form-check styling
+- [ ] Update individual user checkboxes in table rows to use proper Bootstrap form-check styling
+- [ ] Test the bulk delete functionality to ensure it works correctly
+- [ ] Verify the display looks proper and checkboxes are aligned
 
 ## Notes
-- The controller methods (exportPdf and exportUserPdf) do not need changes as they pass data correctly to the updated views.
-- All text in the PDF templates is now in Bahasa Indonesia.
-- Longitude and latitude data are no longer displayed in the PDF exports.
-- Table layouts have been optimized for better readability.
+- The bulk delete feature uses soft delete (moves to trash)
+- JavaScript handles enabling/disabling the delete button based on selections
+- Checkboxes need to be wrapped in `<div class="form-check">` for proper Bootstrap styling

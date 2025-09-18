@@ -360,38 +360,16 @@
                         </div>
                         <div>
                             @if(!$attendance->hasCheckedOut())
-                            <button class="btn btn-success" data-toggle="collapse" data-target="#checkoutForm" aria-expanded="false" aria-controls="checkoutForm">
+                            <button class="btn btn-success" data-toggle="modal" data-target="#checkoutModal">
                                 <i class="fas fa-sign-out-alt mr-1"></i> Checkout
                             </button>
                             @endif
-                        </div>
-                    </div>
-                    <div class="collapse mt-3" id="checkoutForm">
-                        <div class="card card-body">
-                            <form action="{{ route('admin.attendances.checkout', $attendance->id) }}" method="POST" enctype="multipart/form-data">
-                                @csrf
-                                <div class="form-group">
-                                    <label for="checkout_at">Checkout Date</label>
-                                    <input type="date" class="form-control" id="checkout_at" name="checkout_at" value="{{ now()->format('Y-m-d') }}" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="checkout_time">Checkout Time</label>
-                                    <input type="time" class="form-control" id="checkout_time" name="checkout_time" value="{{ now()->format('H:i') }}" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="checkout_latitude">Checkout Latitude</label>
-                                    <input type="text" class="form-control" id="checkout_latitude" name="checkout_latitude" value="{{ old('checkout_latitude') }}">
-                                </div>
-                                <div class="form-group">
-                                    <label for="checkout_longitude">Checkout Longitude</label>
-                                    <input type="text" class="form-control" id="checkout_longitude" name="checkout_longitude" value="{{ old('checkout_longitude') }}">
-                                </div>
-                                <div class="form-group">
-                                    <label for="checkout_photo">Checkout Photo (Base64)</label>
-                                    <textarea class="form-control" id="checkout_photo" name="checkout_photo" rows="3">{{ old('checkout_photo') }}</textarea>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Submit Checkout</button>
-                            </form>
+                            <a href="{{ route('admin.attendances.exportSinglePdf', $attendance->id) }}" class="btn btn-info" target="_blank">
+                                <i class="fas fa-file-pdf mr-1"></i> Export PDF
+                            </a>
+                            <a href="{{ route('admin.attendances.exportSingleExcel', $attendance->id) }}" class="btn btn-success">
+                                <i class="fas fa-file-excel mr-1"></i> Export Excel
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -520,4 +498,48 @@
 }
 </style>
 @endif
+
+<!-- Checkout Modal -->
+<div class="modal fade" id="checkoutModal" tabindex="-1" role="dialog" aria-labelledby="checkoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="checkoutModalLabel">Record Checkout</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ route('admin.attendances.checkout', $attendance->id) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="checkout_at">Checkout Date</label>
+                        <input type="date" class="form-control" id="checkout_at" name="checkout_at" value="{{ now()->format('Y-m-d') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="checkout_time">Checkout Time</label>
+                        <input type="time" class="form-control" id="checkout_time" name="checkout_time" value="{{ now()->format('H:i') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="checkout_latitude">Checkout Latitude</label>
+                        <input type="text" class="form-control" id="checkout_latitude" name="checkout_latitude" value="{{ old('checkout_latitude') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="checkout_longitude">Checkout Longitude</label>
+                        <input type="text" class="form-control" id="checkout_longitude" name="checkout_longitude" value="{{ old('checkout_longitude') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="checkout_photo">Checkout Photo</label>
+                        <input type="file" class="form-control" id="checkout_photo" name="checkout_photo" accept="image/*">
+                        <small class="form-text text-muted">Select an image file for checkout photo</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Checkout</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection

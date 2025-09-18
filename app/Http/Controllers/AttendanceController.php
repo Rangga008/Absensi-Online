@@ -645,7 +645,7 @@ public function checkAttendanceStatus(Request $request)
 /**
  * Process export request with better validation
  */
-public function export(Request $request)
+public function processExport(Request $request)
 {
     $validated = $request->validate([
         'export_type' => 'required|in:by_date,by_user,by_role,by_date_range',
@@ -972,7 +972,7 @@ public function export(Request $request)
             'checkout_time' => 'required',
             'checkout_latitude' => 'nullable|numeric|between:-90,90',
             'checkout_longitude' => 'nullable|numeric|between:-180,180',
-            'checkout_photo' => 'nullable|string',
+            'checkout_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         try {
@@ -993,8 +993,8 @@ public function export(Request $request)
 
             // Process checkout photo if provided
             $checkoutPhotoPath = null;
-            if (!empty($validated['checkout_photo'])) {
-                $checkoutPhotoPath = $this->processCheckoutPhoto($validated['checkout_photo'], $attendance->user_id);
+            if ($request->hasFile('checkout_photo')) {
+                $checkoutPhotoPath = $this->processCheckoutPhotoFile($request->file('checkout_photo'), $attendance->user_id);
             }
 
             // Calculate checkout distance if coordinates provided
@@ -1029,36 +1029,23 @@ public function export(Request $request)
     }
 
     /**
-     * Process checkout photo for admin
+     * Process checkout photo for admin (file upload)
      */
-    private function processCheckoutPhoto($photoData, $userId)
+    private function processCheckoutPhotoFile($photoFile, $userId)
     {
         try {
-            // Remove data URL prefix if exists
-            if (strpos($photoData, 'data:image') === 0) {
-                $photoData = preg_replace('#^data:image/\w+;base64,#i', '', $photoData);
-            }
-
-            $photoData = str_replace(' ', '+', $photoData);
-            $decodedImage = base64_decode($photoData);
-
-            // Validate image
-            if (!$decodedImage) {
-                throw new \Exception('Invalid base64 image data');
-            }
-
-            // Test if it's a valid image
-            $imageInfo = @getimagesizefromstring($decodedImage);
-            if (!$imageInfo) {
-                throw new \Exception('Invalid image format');
+            // Validate file
+            if (!$photoFile->isValid()) {
+                throw new \Exception('Invalid file upload');
             }
 
             // Generate unique filename for checkout
-            $imageName = 'checkout_admin_' . time() . '_' . $userId . '.jpg';
+            $extension = $photoFile->getClientOriginalExtension();
+            $imageName = 'checkout_admin_' . time() . '_' . $userId . '.' . $extension;
             $storagePath = 'attendance-photos/' . $imageName;
 
             // Store the image
-            $stored = Storage::disk('public')->put($storagePath, $decodedImage);
+            $stored = Storage::disk('public')->put($storagePath, file_get_contents($photoFile->getRealPath()));
 
             if (!$stored) {
                 throw new \Exception('Failed to store checkout image');
@@ -1071,7 +1058,7 @@ public function export(Request $request)
 
             Log::info('Admin checkout photo processed successfully', [
                 'path' => $storagePath,
-                'size' => strlen($decodedImage),
+                'size' => $photoFile->getSize(),
                 'user_id' => $userId
             ]);
 
@@ -1083,6 +1070,150 @@ public function export(Request $request)
                 'user_id' => $userId
             ]);
             throw new \Exception('Failed to process checkout photo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export single attendance to PDF
+     */
+    public function exportSinglePdf($id)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $attendance = Attendance::with('user')->findOrFail($id);
+
+            // Get office location from settings
+            $officeLat = (float) setting('office_lat', -6.906000);
+            $officeLng = (float) setting('office_lng', 107.623400);
+
+            // Calculate distances
+            if ($attendance->latitude && $attendance->longitude) {
+                $attendance->distance = $this->calculateDistance(
+                    $attendance->latitude,
+                    $attendance->longitude,
+                    $officeLat,
+                    $officeLng
+                );
+            }
+
+            if ($attendance->checkout_latitude && $attendance->checkout_longitude) {
+                $attendance->checkout_distance = $this->calculateDistance(
+                    $attendance->checkout_latitude,
+                    $attendance->checkout_longitude,
+                    $officeLat,
+                    $officeLng
+                );
+            }
+
+            $pdf = Pdf::loadView('admin.attendance.export_single_pdf', compact('attendance'));
+
+            $filename = 'attendance_' . $attendance->user->name . '_' . $attendance->present_date . '.pdf';
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting single attendance to PDF', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export single attendance to Excel
+     */
+    public function exportSingleExcel($id)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        try {
+            $attendance = Attendance::with('user')->findOrFail($id);
+
+            // Get office location from settings
+            $officeLat = (float) setting('office_lat', -6.906000);
+            $officeLng = (float) setting('office_lng', 107.623400);
+
+            // Calculate distances
+            if ($attendance->latitude && $attendance->longitude) {
+                $attendance->distance = $this->calculateDistance(
+                    $attendance->latitude,
+                    $attendance->longitude,
+                    $officeLat,
+                    $officeLng
+                );
+            }
+
+            if ($attendance->checkout_latitude && $attendance->checkout_longitude) {
+                $attendance->checkout_distance = $this->calculateDistance(
+                    $attendance->checkout_latitude,
+                    $attendance->checkout_longitude,
+                    $officeLat,
+                    $officeLng
+                );
+            }
+
+            $filename = 'attendance_' . $attendance->user->name . '_' . $attendance->present_date . '.xlsx';
+
+            return Excel::download(new class([$attendance]) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithMapping {
+                private $attendances;
+
+                public function __construct($attendances)
+                {
+                    $this->attendances = $attendances;
+                }
+
+                public function collection()
+                {
+                    return collect($this->attendances);
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'Nama',
+                        'Tanggal',
+                        'Waktu Masuk',
+                        'Status',
+                        'Waktu Keluar',
+                        'Durasi Kerja',
+                        'Latitude Masuk',
+                        'Longitude Masuk',
+                        'Jarak Masuk (m)',
+                        'Latitude Keluar',
+                        'Longitude Keluar',
+                        'Jarak Keluar (m)',
+                        'IP Address',
+                        'User Agent'
+                    ];
+                }
+
+                public function map($attendance): array
+                {
+                    return [
+                        $attendance->user->name ?? '',
+                        $attendance->present_date,
+                        $attendance->present_at ? $attendance->present_at->format('H:i:s') : '',
+                        $attendance->description,
+                        $attendance->checkout_at ? $attendance->checkout_at->format('H:i:s') : '',
+                        $attendance->work_duration_formatted ?: '-',
+                        $attendance->latitude,
+                        $attendance->longitude,
+                        $attendance->distance,
+                        $attendance->checkout_latitude,
+                        $attendance->checkout_longitude,
+                        $attendance->checkout_distance,
+                        $attendance->ip_address,
+                        $attendance->user_agent
+                    ];
+                }
+            }, $filename);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting single attendance to Excel', ['error' => $e->getMessage(), 'id' => $id]);
+            return back()->with('error', 'Error exporting data: ' . $e->getMessage());
         }
     }
 
