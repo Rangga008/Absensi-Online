@@ -28,7 +28,7 @@
 
                     <hr>
 
-                    <form id="concessionForm" method="POST" action="{{ route('user.concession.store') }}">
+                    <form method="POST" action="{{ route('user.concession.store') }}" enctype="multipart/form-data">
                         @csrf
                         
                         <div class="form-group">
@@ -77,8 +77,8 @@
                                     <label for="start_date" class="font-weight-bold">
                                         <i class="fas fa-calendar-day mr-1"></i>Tanggal Mulai
                                     </label>
-                                    <input type="date" class="form-control @error('start_date') is-invalid @enderror" 
-                                           name="start_date" id="start_date" 
+                                    <input type="date" class="form-control @error('start_date') is-invalid @enderror"
+                                           name="start_date" id="start_date"
                                            value="{{ old('start_date') }}"
                                            min="{{ date('Y-m-d') }}"
                                            required>
@@ -94,8 +94,8 @@
                                     <label for="end_date" class="font-weight-bold">
                                         <i class="fas fa-calendar-day mr-1"></i>Tanggal Selesai
                                     </label>
-                                    <input type="date" class="form-control @error('end_date') is-invalid @enderror" 
-                                           name="end_date" id="end_date" 
+                                    <input type="date" class="form-control @error('end_date') is-invalid @enderror"
+                                           name="end_date" id="end_date"
                                            value="{{ old('end_date') }}"
                                            min="{{ date('Y-m-d') }}"
                                            required>
@@ -106,6 +106,23 @@
                                     @enderror
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="file" class="font-weight-bold">
+                                <i class="fas fa-file-upload mr-1"></i>Bukti Izin (Opsional)
+                            </label>
+                            <input type="file" class="form-control @error('file') is-invalid @enderror"
+                                   name="file" id="file"
+                                   accept="image/*,.pdf,.doc,.docx">
+                            <small class="form-text text-muted">
+                                Upload bukti izin seperti surat dokter, surat resmi, dll. (Format: JPG, PNG, PDF, DOC, DOCX - Max 5MB)
+                            </small>
+                            @error('file')
+                            <div class="invalid-feedback">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ $message }}
+                            </div>
+                            @enderror
                         </div>
 
                         <div class="form-group mt-4">
@@ -158,46 +175,40 @@ $(document).ready(function() {
     // Form submission handling
     $('#concessionForm').submit(function(e) {
         e.preventDefault();
-        
+
         const form = $(this);
         const submitBtn = $('#submitBtn');
-        
+
         submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Mengirim...');
-        
+
+        // Create FormData for file upload
+        const formData = new FormData(this);
+
         $.ajax({
             url: form.attr('action'),
             method: 'POST',
-            data: form.serialize(),
+            data: formData,
+            processData: false,
+            contentType: false,
             headers: {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             },
             success: function(response) {
                 if (response.success) {
-                    // Tampilkan SweetAlert sukses
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sukses!',
-                        text: response.message,
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: '#007bff'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            // Redirect ke halaman history setelah klik OK
-                            window.location.href = "{{ route('user.concession.history') }}";
-                        }
-                    });
+                    // Redirect langsung ke halaman utama tanpa popup
+                    window.location.href = "{{ route('user.home') }}";
                 }
             },
             error: function(xhr) {
                 let errorMessage = 'Terjadi kesalahan';
-                
+
                 if (xhr.responseJSON && xhr.responseJSON.errors) {
                     const errors = xhr.responseJSON.errors;
                     errorMessage = Object.values(errors)[0][0];
                 } else if (xhr.responseJSON && xhr.responseJSON.message) {
                     errorMessage = xhr.responseJSON.message;
                 }
-                
+
                 // Tampilkan SweetAlert error
                 Swal.fire({
                     icon: 'error',

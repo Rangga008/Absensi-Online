@@ -87,7 +87,8 @@ class HomeController extends Controller
         ->select('id', 'reason as present_at', 'description', 'created_at', DB::raw("'izin' as type"), 'status',
                  DB::raw("NULL as checkout_at"), DB::raw("NULL as checkout_photo_path"),
                  DB::raw("NULL as work_duration_minutes"), DB::raw("NULL as checkout_distance"), DB::raw("NULL as photo_path"))
-        ->where('user_id', $userId);
+        ->where('user_id', $userId)
+        ->whereNull('deleted_at'); // Exclude soft-deleted records
 
     // Gabungkan kedua query
     $histories = $attendance->union($concession)

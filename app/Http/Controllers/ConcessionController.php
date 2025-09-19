@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class ConcessionController extends Controller
@@ -38,30 +39,59 @@ class ConcessionController extends Controller
             'reason' => 'required|in:sakit,izin,cuti',
             'description' => 'required|string|min:5|max:500',
             'start_date' => 'required|date|after_or_equal:today',
-            'end_date' => 'required|date|after_or_equal:start_date'
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:5120' // 5MB max
         ]);
 
         DB::beginTransaction();
         try {
+            $filePath = null;
+
+            // Handle file upload
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+
+                if (!$file->isValid()) {
+                    return back()->with('error', 'File bukti izin tidak valid')->withInput();
+                }
+
+                $fileName = 'concession_' . session('user_id') . '_' . time() . '.' . $file->getClientOriginalExtension();
+
+                $uploadDir = public_path('uploads/concessions');
+                if (!File::exists($uploadDir)) {
+                    File::makeDirectory($uploadDir, 0755, true);
+                }
+
+                $file->move($uploadDir, $fileName);
+                $filePath = 'uploads/concessions/' . $fileName;
+
+                if (!File::exists(public_path($filePath))) {
+                    throw new \Exception('File bukti izin tidak ditemukan setelah upload');
+                }
+            }
+
             $concession = Concession::create([
                 'user_id' => session('user_id'),
                 'reason' => $validated['reason'],
                 'description' => $validated['description'],
                 'start_date' => $validated['start_date'],
                 'end_date' => $validated['end_date'],
-                'status' => 'pending'
+                'status' => 'pending',
+                'file_path' => $filePath
             ]);
 
             DB::commit();
-            
+
             return redirect()->route('user.home')
                    ->with('success', 'Pengajuan izin berhasil dibuat!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('User concession error: '.$e->getMessage());
-            return back()->withInput()
-                   ->with('error', 'Gagal menyimpan pengajuan izin');
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan pengajuan izin'
+            ], 500);
         }
     }
 
@@ -290,6 +320,9 @@ class ConcessionController extends Controller
         DB::beginTransaction();
         try {
             $concession = Concession::findOrFail($id);
+            // Delete related attendance or history if any
+            // Assuming there is a relation or history table, if not, skip this
+            // For now, just delete the concession record (soft delete)
             $concession->delete();
             DB::commit();
 
@@ -372,7 +405,12 @@ class ConcessionController extends Controller
         try {
             $concession = Concession::with(['user', 'approver'])->findOrFail($id);
 
-            $pdf = Pdf::loadView('admin.concession.export_pdf', compact('concession'));
+            $kopsuratPath = setting('kopsurat');
+
+            $pdf = Pdf::loadView('admin.concession.export_pdf', [
+                'concession' => $concession,
+                'kopsuratPath' => $kopsuratPath,
+            ]);
             $filename = 'pengajuan-izin-' . $concession->user->name . '-' . $concession->id . '.pdf';
 
             return $pdf->download($filename);

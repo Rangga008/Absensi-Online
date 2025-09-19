@@ -102,6 +102,24 @@
                 <th>Status</th>
                 <td>{{ ucfirst($concession->status) }}</td>
             </tr>
+            @if($concession->file_path)
+            <tr>
+                <th>Bukti Izin</th>
+                <td>
+                    @php
+                        $fileExt = pathinfo($concession->file_path, PATHINFO_EXTENSION);
+                        $hasValidFile = file_exists(public_path($concession->file_path));
+                    @endphp
+                    @if($hasValidFile && in_array(strtolower($fileExt), ['jpg', 'jpeg', 'png']))
+                        <img src="data:image/{{ strtolower($fileExt) }};base64,{{ base64_encode(file_get_contents(public_path($concession->file_path))) }}" alt="Bukti Izin" style="max-width: 200px; max-height: 200px; object-fit: contain;">
+                    @elseif($hasValidFile)
+                        <p>File terlampir: {{ basename($concession->file_path) }}</p>
+                    @else
+                        <p>File tidak ditemukan</p>
+                    @endif
+                </td>
+            </tr>
+            @endif
             @if($concession->approved_at)
             <tr>
                 <th>Disetujui/Ditolak Pada</th>

@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
             RolesSeeder::class,
             UsersSeeder::class,
             AttendanceSeeder::class,
-            ConcessionSeeder::class,
             SalarySeeder::class,
         ]);
     }

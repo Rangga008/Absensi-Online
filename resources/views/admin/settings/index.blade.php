@@ -35,23 +35,23 @@
         <div class="card-body">
             <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data" id="settingsForm">
                 @csrf
-                
+
                 <div class="row">
                     <!-- Application Settings -->
                     <div class="col-md-6">
                         <h5 class="text-primary mb-3">
                             <i class="fas fa-desktop mr-2"></i>Application Settings
                         </h5>
-                        
+
                         <div class="form-group">
                             <label for="app_name">Application Name</label>
-                            <input type="text" class="form-control" id="app_name" name="app_name" 
+                            <input type="text" class="form-control" id="app_name" name="app_name"
                                    value="{{ old('app_name', $settings['app_name']) }}" required>
                         </div>
 
                         <div class="form-group">
                             <label for="company_name">Company/Institution Name</label>
-                            <input type="text" class="form-control" id="company_name" name="company_name" 
+                            <input type="text" class="form-control" id="company_name" name="company_name"
                                    value="{{ old('company_name', $settings['company_name']) }}" required>
                         </div>
 
@@ -64,156 +64,194 @@
                                 <option value="UTC">UTC</option>
                             </select>
                         </div>
-
-                       <div class="form-group">
-    <label for="logo">Application Logo</label>
-    <div class="custom-file">
-        <input type="file" class="custom-file-input" id="logo" name="logo" accept="image/*">
-        <label class="custom-file-label" for="logo">Choose file...</label>
-    </div>
-    
-    <!-- Current Logo Preview -->
-    @php
-        $logoPath = setting('logo');
-        $hasValidLogo = $logoPath && File::exists(public_path($logoPath));
-    @endphp
-
-    @if($hasValidLogo)
-    <div class="mt-2" id="currentLogoSection">
-        <small>Current Logo:</small><br>
-        <img src="{{ asset($logoPath) }}?v={{ time() }}"
-            alt="Current Logo" 
-            class="img-thumbnail mt-2 current-logo-preview" 
-            style="max-height: 100px;"
-            onerror="this.style.display='none'; document.getElementById('logoError').style.display='block';">
-        <div id="logoError" style="display: none;" class="text-danger mt-2">
-            <small><i class="fas fa-exclamation-triangle"></i> Logo file not found</small>
-        </div>
-    </div>
-    @else
-    <div class="mt-2" id="currentLogoSection">
-        <small class="text-muted">No logo uploaded or default logo will be used</small><br>
-        <img src="{{ asset('images/logo-smk2.png') }}?v={{ time() }}"
-            alt="Default Logo" 
-            class="img-thumbnail mt-2" 
-            style="max-height: 100px;"
-            onerror="this.alt='Default logo not available'">
-    </div>
-    @endif
-    
-    <!-- New Logo Preview (will show when file is selected) -->
-    <div id="newLogoPreview" style="display: none;" class="mt-2">
-        <small>New Logo Preview:</small><br>
-        <img id="logoPreviewImage" class="img-thumbnail mt-2" style="max-height: 100px;">
-    </div>
-    
-    <small class="form-text text-muted">
-        Format: PNG, ICO, JPG, JPEG. Max: 2MB. Logo will be used for favicon and branding.
-    </small>
-
-<!-- Kopsurat Upload -->
-<div class="form-group mt-4">
-    <label for="kopsurat">Kopsurat (Letterhead) Image</label>
-    <div class="custom-file">
-        <input type="file" class="custom-file-input" id="kopsurat" name="kopsurat" accept="image/*">
-        <label class="custom-file-label" for="kopsurat">Choose file...</label>
-    </div>
-
-    @php
-        $kopsuratPath = setting('kopsurat');
-        $hasValidKopsurat = $kopsuratPath && File::exists(public_path($kopsuratPath));
-    @endphp
-
-    @if($hasValidKopsurat)
-    <div class="mt-2" id="currentKopsuratSection">
-        <small>Current Kopsurat:</small><br>
-        <img src="{{ asset($kopsuratPath) }}?v={{ time() }}"
-            alt="Current Kopsurat" 
-            class="img-thumbnail mt-2 current-kopsurat-preview" 
-            style="max-height: 150px;"
-            onerror="this.style.display='none'; document.getElementById('kopsuratError').style.display='block';">
-        <div id="kopsuratError" style="display: none;" class="text-danger mt-2">
-            <small><i class="fas fa-exclamation-triangle"></i> Kopsurat file not found</small>
-        </div>
-    </div>
-    @else
-    <div class="mt-2" id="currentKopsuratSection">
-        <small class="text-muted">No kopsurat uploaded</small>
-    </div>
-    @endif
-
-    <!-- New Kopsurat Preview (will show when file is selected) -->
-    <div id="newKopsuratPreview" style="display: none;" class="mt-2">
-        <small>New Kopsurat Preview:</small><br>
-        <img id="kopsuratPreviewImage" class="img-thumbnail mt-2" style="max-height: 150px;">
-    </div>
-
-    <small class="form-text text-muted">
-        Format: PNG, ICO, JPG, JPEG. Max: 2MB. Kopsurat will be displayed on attendance export PDFs.
-    </small>
-</div>
                     </div>
-                    <!-- Attendance Settings -->
+
+                    <!-- Location & Work Hours Settings -->
                     <div class="col-md-6">
                         <h5 class="text-primary mb-3">
-                            <i class="fas fa-map-marker-alt mr-2"></i>Location Settings
+                            <i class="fas fa-map-marker-alt mr-2"></i>Location & Work Hours
                         </h5>
 
-                        <div class="form-group">
-                            <label for="office_lat">Office Latitude</label>
-                            <input type="number" step="any" class="form-control" id="office_lat" name="office_lat" 
-                                value="{{ old('office_lat', $settings['office_lat']) }}" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="office_lng">Office Longitude</label>
-                            <input type="number" step="any" class="form-control" id="office_lng" name="office_lng" 
-                                value="{{ old('office_lng', $settings['office_lng']) }}" required>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="office_lat">Office Latitude</label>
+                                    <input type="number" step="any" class="form-control" id="office_lat" name="office_lat"
+                                        value="{{ old('office_lat', $settings['office_lat']) }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="office_lng">Office Longitude</label>
+                                    <input type="number" step="any" class="form-control" id="office_lng" name="office_lng"
+                                        value="{{ old('office_lng', $settings['office_lng']) }}" required>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
                             <label for="max_distance">Maximum Allowed Distance (meters)</label>
-                            <input type="number" class="form-control" id="max_distance" name="max_distance" 
+                            <input type="number" class="form-control" id="max_distance" name="max_distance"
                                    value="{{ old('max_distance', $settings['max_distance']) }}" required>
                             <small class="form-text text-muted">Maximum distance from office for valid attendance</small>
                         </div>
 
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> Klik pada peta di bawah untuk memilih lokasi kantor
-                        </div>
-
-                        <h5 class="text-primary mb-3 mt-4">
-                            <i class="fas fa-clock mr-2"></i>Work Hours
-                        </h5>
-
-                        <div class="form-group">
-                            <label for="work_start_time">Work Start Time</label>
-                            <input type="time" class="form-control" id="work_start_time" name="work_start_time" 
-                                   value="{{ old('work_start_time', $settings['work_start_time']) }}" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="work_end_time">Work End Time</label>
-                            <input type="time" class="form-control" id="work_end_time" name="work_end_time" 
-                                   value="{{ old('work_end_time', $settings['work_end_time']) }}" required>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="work_start_time">Work Start Time</label>
+                                    <input type="time" class="form-control" id="work_start_time" name="work_start_time"
+                                           value="{{ old('work_start_time', $settings['work_start_time']) }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="work_end_time">Work End Time</label>
+                                    <input type="time" class="form-control" id="work_end_time" name="work_end_time"
+                                           value="{{ old('work_end_time', $settings['work_end_time']) }}" required>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
                             <label for="late_threshold">Late Threshold Time</label>
-                            <input type="time" class="form-control" id="late_threshold" name="late_threshold" 
+                            <input type="time" class="form-control" id="late_threshold" name="late_threshold"
                                    value="{{ old('late_threshold', $settings['late_threshold']) }}" required>
                             <small class="form-text text-muted">Time after which attendance is marked as late</small>
                         </div>
                     </div>
                 </div>
 
+                <!-- Image Uploads Section -->
                 <div class="row mt-4">
                     <div class="col-12">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save mr-2"></i>Save Settings
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-images mr-2"></i>Images & Branding
+                        </h5>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Logo Upload -->
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-image mr-2"></i>Application Logo
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <div class="custom-file">
+                                        <input type="file" class="custom-file-input" id="logo" name="logo" accept="image/*">
+                                        <label class="custom-file-label" for="logo">Choose logo file...</label>
+                                    </div>
+                                </div>
+
+                                <!-- Current Logo Preview -->
+                                @php
+                                    $logoPath = setting('logo');
+                                    $hasValidLogo = $logoPath && File::exists(public_path($logoPath));
+                                @endphp
+
+                                <div class="text-center mb-3">
+                                    @if($hasValidLogo)
+                                        <small class="text-muted d-block mb-2">Current Logo:</small>
+                                        <img src="{{ asset($logoPath) }}?v={{ time() }}"
+                                            alt="Current Logo"
+                                            class="img-thumbnail current-logo-preview"
+                                            style="max-height: 120px; max-width: 100%;"
+                                            onerror="this.style.display='none'; document.getElementById('logoError').style.display='block';">
+                                        <div id="logoError" style="display: none;" class="text-danger mt-2">
+                                            <small><i class="fas fa-exclamation-triangle"></i> Logo file not found</small>
+                                        </div>
+                                    @else
+                                        <small class="text-muted d-block mb-2">No logo uploaded</small>
+                                        <div class="border rounded p-3 bg-light">
+                                            <i class="fas fa-image fa-3x text-muted"></i>
+                                            <p class="text-muted mb-0 mt-2">Default logo will be used</p>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <!-- New Logo Preview -->
+                                <div id="newLogoPreview" style="display: none;" class="text-center">
+                                    <small class="text-muted d-block mb-2">New Logo Preview:</small>
+                                    <img id="logoPreviewImage" class="img-thumbnail" style="max-height: 120px; max-width: 100%;">
+                                </div>
+
+                                <small class="form-text text-muted d-block text-center">
+                                    Format: PNG, ICO, JPG, JPEG. Max: 2MB.<br>
+                                    Logo will be used for favicon and branding.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kopsurat Upload -->
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-file-alt mr-2"></i>Kopsurat (Letterhead)
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <div class="custom-file">
+                                        <input type="file" class="custom-file-input" id="kopsurat" name="kopsurat" accept="image/*">
+                                        <label class="custom-file-label" for="kopsurat">Choose kopsurat file...</label>
+                                    </div>
+                                </div>
+
+                                <!-- Current Kopsurat Preview -->
+                                @php
+                                    $kopsuratPath = setting('kopsurat');
+                                    $hasValidKopsurat = $kopsuratPath && File::exists(public_path($kopsuratPath));
+                                @endphp
+
+                                <div class="text-center mb-3">
+                                    @if($hasValidKopsurat)
+                                        <small class="text-muted d-block mb-2">Current Kopsurat:</small>
+                                        <img src="{{ asset($kopsuratPath) }}?v={{ time() }}"
+                                            alt="Current Kopsurat"
+                                            class="img-thumbnail current-kopsurat-preview"
+                                            style="max-height: 120px; max-width: 100%;"
+                                            onerror="this.style.display='none'; document.getElementById('kopsuratError').style.display='block';">
+                                        <div id="kopsuratError" style="display: none;" class="text-danger mt-2">
+                                            <small><i class="fas fa-exclamation-triangle"></i> Kopsurat file not found</small>
+                                        </div>
+                                    @else
+                                        <small class="text-muted d-block mb-2">No kopsurat uploaded</small>
+                                        <div class="border rounded p-3 bg-light">
+                                            <i class="fas fa-file-alt fa-3x text-muted"></i>
+                                            <p class="text-muted mb-0 mt-2">No letterhead image</p>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <!-- New Kopsurat Preview -->
+                                <div id="newKopsuratPreview" style="display: none;" class="text-center">
+                                    <small class="text-muted d-block mb-2">New Kopsurat Preview:</small>
+                                    <img id="kopsuratPreviewImage" class="img-thumbnail" style="max-height: 120px; max-width: 100%;">
+                                </div>
+
+                                <small class="form-text text-muted d-block text-center">
+                                    Format: PNG, ICO, JPG, JPEG. Max: 2MB.<br>
+                                    Kopsurat will be displayed on attendance export PDFs.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save mr-2"></i>Save All Settings
                         </button>
-                        <button type="reset" class="btn btn-outline-secondary ml-2">
-                            <i class="fas fa-undo mr-2"></i>Reset
+                        <button type="reset" class="btn btn-outline-secondary btn-lg ml-2">
+                            <i class="fas fa-undo mr-2"></i>Reset Form
                         </button>
                     </div>
                 </div>
@@ -229,11 +267,11 @@
             </h5>
         </div>
         <div class="card-body">
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> Klik pada peta untuk memilih lokasi kantor. 
-                Lingkaran biru menunjukkan radius absensi yang diizinkan.
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle mr-2"></i>Click on the map to select the office location.
+                The blue circle shows the allowed attendance radius.
             </div>
-            
+
             <!-- Map Container -->
             <div id="locationPickerMap" style="height: 500px; width: 100%; border: 1px solid #ddd; border-radius: 8px;">
                 <div id="mapLoading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; text-align: center;">
@@ -243,13 +281,13 @@
                     <p class="mt-2 text-muted">Loading map...</p>
                 </div>
             </div>
-            
+
             <div class="mt-3 text-center">
-                <button id="useCurrentLocation" class="btn btn-info btn-sm">
-                    <i class="fas fa-location-arrow mr-1"></i> Gunakan Lokasi Saat Ini
+                <button id="useCurrentLocation" class="btn btn-info">
+                    <i class="fas fa-location-arrow mr-1"></i> Use Current Location
                 </button>
-                <button id="resetLocation" class="btn btn-outline-secondary btn-sm ml-2">
-                    <i class="fas fa-undo mr-1"></i> Reset ke Default
+                <button id="resetLocation" class="btn btn-outline-secondary ml-2">
+                    <i class="fas fa-undo mr-1"></i> Reset to Default
                 </button>
             </div>
         </div>
@@ -351,10 +389,10 @@ document.addEventListener('DOMContentLoaded', function() {
 document.getElementById('settingsForm').addEventListener('submit', function(e) {
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    
+
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving Settings...';
-    
+
     // Re-enable after 10 seconds as fallback
     setTimeout(function() {
         submitBtn.disabled = false;
@@ -367,20 +405,20 @@ function initializeMaps() {
     const latInput = document.getElementById('office_lat');
     const lngInput = document.getElementById('office_lng');
     const distanceInput = document.getElementById('max_distance');
-    
+
     // Office location from settings
     officeLat = parseFloat(latInput.value || {{ $settings['office_lat'] }});
     officeLng = parseFloat(lngInput.value || {{ $settings['office_lng'] }});
     maxDistance = parseInt(distanceInput.value || {{ $settings['max_distance'] }});
-    
+
     // Fallback to Jakarta if coordinates are invalid
     if (isNaN(officeLat) || isNaN(officeLng)) {
         officeLat = -6.2088;
         officeLng = 106.8456;
     }
-    
+
     console.log('Initializing with coordinates:', officeLat, officeLng);
-    
+
     // Initialize Location Picker Map
     try {
         const mapElement = document.getElementById('locationPickerMap');
@@ -388,22 +426,22 @@ function initializeMaps() {
             // Hide loading indicator
             const loadingElement = document.getElementById('mapLoading');
             if (loadingElement) loadingElement.style.display = 'none';
-            
+
             // Initialize map
             locationPickerMap = L.map('locationPickerMap').setView([officeLat, officeLng], 15);
-            
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(locationPickerMap);
-            
+
             // Add selection marker
             selectionMarker = L.marker([officeLat, officeLng], {
                 draggable: true
             }).addTo(locationPickerMap);
-            
+
             // Add radius circle
             updateRadiusCircle(officeLat, officeLng);
-            
+
             // Event handlers
             selectionMarker.on('dragend', function(e) {
                 const position = selectionMarker.getLatLng();
@@ -411,7 +449,7 @@ function initializeMaps() {
                 updateRadiusCircle(position.lat, position.lng);
                 updateOfficePreviewMap(position.lat, position.lng);
             });
-            
+
             locationPickerMap.on('click', function(e) {
                 selectionMarker.setLatLng(e.latlng);
                 updateLocationFields(e.latlng.lat, e.latlng.lng);
@@ -422,7 +460,7 @@ function initializeMaps() {
     } catch (error) {
         console.error('Error initializing location picker map:', error);
     }
-    
+
     // Initialize Office Preview Map
     try {
         const previewElement = document.getElementById('officeMap');
@@ -430,18 +468,18 @@ function initializeMaps() {
             // Hide loading indicator
             const loadingElement = document.getElementById('previewMapLoading');
             if (loadingElement) loadingElement.style.display = 'none';
-            
+
             // Initialize map
             officePreviewMap = L.map('officeMap').setView([officeLat, officeLng], 15);
-            
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(officePreviewMap);
-            
+
             // Office marker
             officeMarker = L.marker([officeLat, officeLng]).addTo(officePreviewMap)
                 .bindPopup(`<b>Office Location</b><br>Lat: ${officeLat.toFixed(6)}, Lng: ${officeLng.toFixed(6)}<br>Max Distance: ${maxDistance}m`);
-            
+
             // Add radius circle
             previewRadiusCircle = L.circle([officeLat, officeLng], {
                 color: '#4e73df',
@@ -453,7 +491,7 @@ function initializeMaps() {
     } catch (error) {
         console.error('Error initializing office preview map:', error);
     }
-    
+
     // Distance input change handler
     if (distanceInput) {
         distanceInput.addEventListener('input', function() {
@@ -462,7 +500,7 @@ function initializeMaps() {
             updateOfficePreviewMap(officeLat, officeLng);
         });
     }
-    
+
     // Use current location button
     const useCurrentLocationBtn = document.getElementById('useCurrentLocation');
     if (useCurrentLocationBtn) {
@@ -471,59 +509,59 @@ function initializeMaps() {
                 alert('Browser tidak mendukung geolokasi');
                 return;
             }
-            
+
             this.disabled = true;
             this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Getting location...';
-            
+
             navigator.geolocation.getCurrentPosition(
                 function(position) {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    
+
                     if (selectionMarker) {
                         selectionMarker.setLatLng([lat, lng]);
                     }
                     updateLocationFields(lat, lng);
                     updateRadiusCircle(lat, lng);
                     updateOfficePreviewMap(lat, lng);
-                    
+
                     if (locationPickerMap) {
                         locationPickerMap.setView([lat, lng], 15);
                     }
-                    
+
                     useCurrentLocationBtn.disabled = false;
-                    useCurrentLocationBtn.innerHTML = '<i class="fas fa-location-arrow mr-1"></i> Gunakan Lokasi Saat Ini';
-                    
-                    alert('Lokasi saat ini berhasil digunakan!');
+                    useCurrentLocationBtn.innerHTML = '<i class="fas fa-location-arrow mr-1"></i> Use Current Location';
+
+                    alert('Current location has been set successfully!');
                 },
                 function(error) {
                     useCurrentLocationBtn.disabled = false;
-                    useCurrentLocationBtn.innerHTML = '<i class="fas fa-location-arrow mr-1"></i> Gunakan Lokasi Saat Ini';
+                    useCurrentLocationBtn.innerHTML = '<i class="fas fa-location-arrow mr-1"></i> Use Current Location';
                     alert('Error getting location: ' + error.message);
                 }
             );
         });
     }
-    
+
     // Reset location button
     const resetLocationBtn = document.getElementById('resetLocation');
     if (resetLocationBtn) {
         resetLocationBtn.addEventListener('click', function() {
             const defaultLat = -6.2088;
             const defaultLng = 106.8456;
-            
+
             if (selectionMarker) {
                 selectionMarker.setLatLng([defaultLat, defaultLng]);
             }
             updateLocationFields(defaultLat, defaultLng);
             updateRadiusCircle(defaultLat, defaultLng);
             updateOfficePreviewMap(defaultLat, defaultLng);
-            
+
             if (locationPickerMap) {
                 locationPickerMap.setView([defaultLat, defaultLng], 15);
             }
-            
-            alert('Lokasi direset ke Jakarta');
+
+            alert('Location reset to Jakarta');
         });
     }
 }
@@ -532,7 +570,7 @@ function initializeMaps() {
 function updateLocationFields(lat, lng) {
     const latInput = document.getElementById('office_lat');
     const lngInput = document.getElementById('office_lng');
-    
+
     if (latInput && lngInput) {
         officeLat = lat;
         officeLng = lng;
@@ -545,7 +583,7 @@ function updateRadiusCircle(lat, lng) {
     if (radiusCircle && locationPickerMap) {
         locationPickerMap.removeLayer(radiusCircle);
     }
-    
+
     if (locationPickerMap) {
         radiusCircle = L.circle([lat, lng], {
             color: '#007bff',
@@ -561,11 +599,11 @@ function updateOfficePreviewMap(lat, lng) {
         officePreviewMap.setView([lat, lng], 15);
         officeMarker.setLatLng([lat, lng]);
         officeMarker.getPopup().setContent(`<b>Office Location</b><br>Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}<br>Max Distance: ${maxDistance}m`);
-        
+
         if (previewRadiusCircle) {
             officePreviewMap.removeLayer(previewRadiusCircle);
         }
-        
+
         previewRadiusCircle = L.circle([lat, lng], {
             color: '#4e73df',
             fillColor: '#4e73df',

@@ -30,7 +30,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label><strong>Karyawan:</strong></label>
+                                <label><strong>User:</strong></label>
                                 <p class="form-control-plaintext">
                                     <div class="d-flex align-items-center">
                                         @if($concession->user->profile_photo_path)
@@ -103,6 +103,39 @@
                             {{ $concession->description }}
                         </div>
                     </div>
+
+                    @if($concession->file_path)
+                    <div class="form-group">
+                        <label><strong>Bukti Izin:</strong></label>
+                        <div class="border rounded p-3 bg-light">
+                            @php
+                                $fileExt = pathinfo($concession->file_path, PATHINFO_EXTENSION);
+                                $hasValidFile = file_exists(public_path($concession->file_path));
+                            @endphp
+                            @if($hasValidFile)
+                                <div class="d-flex align-items-center">
+                                    @if(in_array(strtolower($fileExt), ['jpg', 'jpeg', 'png']))
+                                        <img src="{{ asset($concession->file_path) }}" alt="Bukti Izin" class="img-thumbnail mr-3" style="max-width: 150px; max-height: 150px;">
+                                    @else
+                                        <i class="fas fa-file-alt fa-3x text-primary mr-3"></i>
+                                    @endif
+                                    <div>
+                                        <p class="mb-1"><strong>{{ basename($concession->file_path) }}</strong></p>
+                                        <p class="mb-2 text-muted">Format: {{ strtoupper($fileExt) }}</p>
+                                        <a href="{{ asset($concession->file_path) }}" target="_blank" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-download mr-1"></i> Download File
+                                        </a>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="text-muted">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    File tidak ditemukan
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>

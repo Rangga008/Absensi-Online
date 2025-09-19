@@ -19,7 +19,8 @@ class Concession extends Model
         'end_date',
         'status',
         'approved_by',
-        'approved_at'
+        'approved_at',
+        'file_path'
     ];
 
     protected $casts = [
