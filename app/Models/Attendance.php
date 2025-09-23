@@ -36,7 +36,7 @@ class Attendance extends Model
     protected $casts = [
         'present_at' => 'datetime',
         'checkout_at' => 'datetime',
-        'present_date' => 'date',
+        'present_date' => 'date:Y-m-d',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
         'checkout_latitude' => 'decimal:7',
@@ -83,6 +83,18 @@ class Attendance extends Model
     {
         return $this->checkout_at ? $this->checkout_at->setTimezone('Asia/Jakarta')->format('H:i:s') : null;
     }
+
+    public function setPresentDateAttribute($value)
+    {
+        // Pastikan hanya format Y-m-d yang disimpan
+        $this->attributes['present_date'] = Carbon::parse($value)->format('Y-m-d');
+    }
+
+    public function getPresentDateAttribute($value)
+    {
+        return $value ? Carbon::parse($value)->format('Y-m-d') : null;
+    }
+
 
     public function hasCheckedOut()
     {
@@ -155,7 +167,25 @@ class Attendance extends Model
      */
     public function getFormattedDateAttribute()
     {
-        return $this->present_date ? $this->present_date->format('d F Y') : null;
+        if (!$this->present_date) {
+            return null;
+        }
+
+        // Format as date only (without time)
+        return $this->present_date->format('Y-m-d');
+    }
+
+    /**
+     * Accessor for display date (formatted for UI)
+     */
+    public function getDisplayDateAttribute()
+    {
+        if (!$this->present_date) {
+            return null;
+        }
+
+        // Format as readable date without time
+        return $this->present_date->format('d F Y');
     }
 
     /**

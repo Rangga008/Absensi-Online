@@ -140,7 +140,7 @@
                 <td style="text-align: center;">{{ $index + 1 }}</td>
                 <td>{{ $attendance->user->name ?? '-' }}</td>
                 <td>{{ $attendance->user->role->role_name ?? '-' }}</td>
-                <td>{{ $attendance->present_date }}</td>
+                <td>{{ $attendance->display_date }}</td>
                 <td>{{ $attendance->present_at ? $attendance->present_at->format('H:i:s') : '-' }}</td>
                 <td>{{ $attendance->description }}</td>
                 <td>{{ $attendance->hasCheckedOut() ? 'Sudah Keluar' : 'Belum Keluar' }}</td>

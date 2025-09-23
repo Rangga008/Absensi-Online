@@ -60,12 +60,14 @@ class AttendanceController extends Controller
             $maxDistance = (int) setting('max_distance', 500);
             $companyName = setting('company_name', 'sekolah');
             $timezone = setting('timezone', 'Asia/Jakarta');
+            $currentTime = now($timezone);
             $workStartTime = setting('work_start_time', '07:00');
             $workEndTime = setting('work_end_time', '16:00');
             $lateThreshold = setting('late_threshold', '07:15');
 
             // Check for duplicate attendance first
             $this->checkDuplicateAttendance($validated['user_id'], $timezone);
+            $presentDate = $currentTime->format('Y-m-d'); // Hanya tanggal
 
             // Process photo
             $photoPath = null;
