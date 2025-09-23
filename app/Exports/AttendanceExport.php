@@ -28,9 +28,15 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             'Tanggal',
             'Waktu',
             'Status',
+            'Checkout Status',
+            'Checkout Time',
+            'Durasi Kerja',
             'Latitude',
             'Longitude',
             'Jarak (m)',
+            'Checkout Latitude',
+            'Checkout Longitude',
+            'Checkout Jarak (m)',
             'IP Address'
         ];
     }
@@ -43,9 +49,15 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping
             $attendance->present_date,
             $attendance->present_at ? $attendance->present_at->format('H:i:s') : '',
             $attendance->description,
+            $attendance->hasCheckedOut() ? 'Sudah Keluar' : 'Belum Keluar',
+            $attendance->checkout_at ? $attendance->checkout_at->format('H:i:s') : '',
+            $attendance->work_duration_formatted ?: '-',
             $attendance->latitude,
             $attendance->longitude,
             $attendance->distance,
+            $attendance->checkout_latitude,
+            $attendance->checkout_longitude,
+            $attendance->checkout_distance,
             $attendance->ip_address
         ];
     }

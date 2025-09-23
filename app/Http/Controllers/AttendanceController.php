@@ -521,9 +521,13 @@ public function checkAttendanceStatus(Request $request)
                         'Status',
                         'Checkout Status',
                         'Checkout Time',
+                        'Durasi Kerja',
                         'Latitude',
                         'Longitude',
                         'Jarak (m)',
+                        'Checkout Latitude',
+                        'Checkout Longitude',
+                        'Checkout Jarak (m)',
                         'IP Address'
                     ];
                 }
@@ -538,9 +542,13 @@ public function checkAttendanceStatus(Request $request)
                         $attendance->description,
                         $attendance->hasCheckedOut() ? 'Sudah Keluar' : 'Belum Keluar',
                         $attendance->checkout_at ? $attendance->checkout_at->format('H:i:s') : '',
+                        $attendance->work_duration_formatted ?: '-',
                         $attendance->latitude,
                         $attendance->longitude,
                         $attendance->distance,
+                        $attendance->checkout_latitude,
+                        $attendance->checkout_longitude,
+                        $attendance->checkout_distance,
                         $attendance->ip_address
                     ];
                 }
