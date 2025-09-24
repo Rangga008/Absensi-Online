@@ -132,11 +132,11 @@
         </div>
         
         <button class="btn btn-primary mt-3" id="attendance" disabled>
-            <i class="fas fa-clock"></i> Absen Sekarang
+            <i class="fas fa-clock"></i> Absen Masuk
         </button>
          <div class="mt-2">
                 <a href="{{ route('user.checkout') }}" class="btn btn-outline-danger">
-                <i class="fas fa-sign-out-alt"></i> Halaman Checkout
+                <i class="fas fa-sign-out-alt"></i> Halaman Absen Keluar
             </a>
         </div>
     </div>

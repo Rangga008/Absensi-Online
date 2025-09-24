@@ -130,8 +130,8 @@
                     <div class="action-icon bg-info-light text-info mb-3">
                         <i class="fas fa-history"></i>
                     </div>
-                    <h5 class="card-title">History Absen</h5>
-                    <p class="card-text text-muted">Lihat riwayat kehadiran</p>
+                    <h5 class="card-title">Rekap Absen</h5>
+                    <p class="card-text text-muted">Lihat rekap kehadiran</p>
                 </div>
             </a>
         </div>

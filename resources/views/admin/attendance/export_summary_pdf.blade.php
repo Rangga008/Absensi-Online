@@ -88,7 +88,7 @@
                 <td>{{ $user->name }}</td>
                 <td>{{ $user->role->role_name ?? '-' }}</td>
                 <td style="text-align: center;">{{ $user->attendances_count ?? 0 }}</td>
-                <td>{{ $user->latestAttendance ? $user->latestAttendance->display_date : '-' }}</td>
+                <td>{{ $user->latestAttendance ? $user->latestAttendance->present_date : '-' }}</td>
             </tr>
             @endforeach
         </tbody>

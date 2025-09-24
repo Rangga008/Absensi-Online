@@ -8,7 +8,7 @@
                 <div class="card-header bg-gradient-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
-                            <i class="fas fa-history mr-2"></i>Riwayat 7 Hari Terakhir
+                            <i class="fas fa-history mr-2"></i>Rekap 7 Hari Terakhir
                         </h5>
                         <span class="badge badge-light">
                             <i class="fas fa-calendar-alt mr-1"></i>
