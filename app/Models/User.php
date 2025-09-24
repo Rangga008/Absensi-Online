@@ -23,7 +23,16 @@ class User extends Model
         'phone',
         'address',
         'role_id',
+        'shift_id',
     ];
+
+    /**
+     * Get the shift assigned to the user
+     */
+    public function shift()
+    {
+        return $this->belongsTo(WorkTime::class, 'shift_id');
+    }
 
     public function role()
     {
@@ -34,36 +43,40 @@ class User extends Model
     {
         return $this->hasMany(Salary::class);
     }
-    // app/Models/User.php
 
-
-// app/Models/User.php
-
-public function getLastAttendanceAttribute()
-{
-    return $this->attendances()->orderBy('present_at', 'desc')->first();
-}
-
-// In User.php model
-public function latestAttendance()
-{
-    return $this->hasOne(Attendance::class)->latestOfMany('present_at');
-}
-
-public function getStatusBadgeAttribute()
-{
-    $status = $this->description ?? '';
-    
-    switch($status) {
-        case 'Hadir': return 'success';
-        case 'Terlambat': return 'warning';
-        case 'Sakit': return 'info';
-        case 'Izin': return 'secondary';
-        case 'Dinas Luar': return 'primary';
-        case 'WFH': return 'dark';
-        default: return 'light';
+    /**
+     * Get the last attendance record
+     */
+    public function getLastAttendanceAttribute()
+    {
+        return $this->attendances()->orderBy('present_at', 'desc')->first();
     }
-}
+
+    /**
+     * Get the latest attendance record
+     */
+    public function latestAttendance()
+    {
+        return $this->hasOne(Attendance::class)->latestOfMany('present_at');
+    }
+
+    /**
+     * Get status badge color for attendance
+     */
+    public function getStatusBadgeAttribute()
+    {
+        $status = $this->description ?? '';
+
+        switch($status) {
+            case 'Hadir': return 'success';
+            case 'Terlambat': return 'warning';
+            case 'Sakit': return 'info';
+            case 'Izin': return 'secondary';
+            case 'Dinas Luar': return 'primary';
+            case 'WFH': return 'dark';
+            default: return 'light';
+        }
+    }
 
 
 

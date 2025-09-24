@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Role;
+use App\Models\WorkTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -481,5 +482,165 @@ class UserController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Assign shift to user
+     */
+    public function assignShift(Request $request, $userId)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'shift_id' => 'nullable|exists:work_times,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid shift selected'
+            ], 400);
+        }
+
+        try {
+            $user = User::findOrFail($userId);
+            $shiftId = $request->shift_id;
+
+            // If shift_id is null, remove shift assignment
+            if ($shiftId === null) {
+                $user->update(['shift_id' => null]);
+
+                Log::info('User shift removed', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name,
+                    'admin_id' => session('admin_id')
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Shift removed successfully',
+                    'shift_name' => 'No Shift'
+                ]);
+            }
+
+            // Assign new shift
+            $shift = WorkTime::findOrFail($shiftId);
+            $user->update(['shift_id' => $shiftId]);
+
+            Log::info('User shift assigned', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'shift_id' => $shift->id,
+                'shift_name' => $shift->name,
+                'admin_id' => session('admin_id')
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Shift assigned successfully',
+                'shift_name' => $shift->name,
+                'shift_time' => $shift->formatted_start_time . ' - ' . $shift->formatted_end_time
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error assigning shift to user', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+                'admin_id' => session('admin_id')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error assigning shift: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available shifts for assignment
+     */
+    public function getAvailableShifts()
+    {
+        try {
+            $shifts = WorkTime::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'start_time', 'end_time', 'late_threshold']);
+
+            return response()->json([
+                'success' => true,
+                'shifts' => $shifts
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching available shifts', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching shifts'
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk assign shifts to multiple users
+     */
+    public function bulkAssignShift(Request $request)
+    {
+        if (!session('is_admin')) {
+            return redirect()->route('admin.login');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'exists:users,id',
+            'shift_id' => 'nullable|exists:work_times,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid data provided'
+            ], 400);
+        }
+
+        try {
+            $userIds = $request->user_ids;
+            $shiftId = $request->shift_id;
+            $shiftName = $shiftId ? WorkTime::find($shiftId)->name : 'No Shift';
+
+            $updatedCount = 0;
+
+            foreach ($userIds as $userId) {
+                $user = User::find($userId);
+                if ($user) {
+                    $user->update(['shift_id' => $shiftId]);
+                    $updatedCount++;
+                }
+            }
+
+            Log::info('Bulk shift assignment', [
+                'user_count' => $updatedCount,
+                'shift_id' => $shiftId,
+                'shift_name' => $shiftName,
+                'admin_id' => session('admin_id')
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully assigned {$shiftName} to {$updatedCount} users"
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error in bulk shift assignment', [
+                'error' => $e->getMessage(),
+                'admin_id' => session('admin_id')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error in bulk assignment: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

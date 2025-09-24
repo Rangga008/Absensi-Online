@@ -31,6 +31,95 @@
         </div>
     @endif
 
+    <!-- Work Times Management Section -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-clock mr-2"></i>Work Times / Shifts Management
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <p class="text-muted mb-0">Manage different work shifts and their schedules</p>
+                <a href="{{ route('admin.settings.work-times.create') }}" class="btn btn-success">
+                    <i class="fas fa-plus mr-1"></i>Add New Shift
+                </a>
+            </div>
+
+            @if(isset($workTimes) && $workTimes->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Shift Name</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Late Threshold</th>
+                                <th>Status</th>
+                                <th>Users</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($workTimes as $workTime)
+                                <tr>
+                                    <td>
+                                        <strong>{{ $workTime->name }}</strong>
+                                        @if($workTime->description)
+                                            <br><small class="text-muted">{{ $workTime->description }}</small>
+                                        @endif
+                                    </td>
+                                    <td>{{ $workTime->formatted_start_time }}</td>
+                                    <td>{{ $workTime->formatted_end_time }}</td>
+                                    <td>{{ $workTime->formatted_late_threshold }}</td>
+                                    <td>
+                                        <span class="badge badge-{{ $workTime->is_active ? 'success' : 'danger' }}">
+                                            {{ $workTime->is_active ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-info">{{ $workTime->users->count() }} users</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ route('admin.settings.work-times.show', $workTime) }}"
+                                               class="btn btn-sm btn-info" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ route('admin.settings.work-times.edit', $workTime) }}"
+                                               class="btn btn-sm btn-warning" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="{{ route('admin.settings.work-times.toggle-status', $workTime) }}"
+                                                  style="display: inline;"
+                                                  onsubmit="return confirm('Are you sure you want to {{ $workTime->is_active ? "deactivate" : "activate" }} this shift?')">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="btn btn-sm btn-{{ $workTime->is_active ? 'danger' : 'success' }}"
+                                                        title="{{ $workTime->is_active ? 'Deactivate' : 'Activate' }}">
+                                                    <i class="fas fa-{{ $workTime->is_active ? 'times' : 'check' }}"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-4">
+                    <i class="fas fa-clock fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Work Times Defined</h5>
+                    <p class="text-muted">Create your first work shift to get started with flexible scheduling.</p>
+                    <a href="{{ route('admin.settings.work-times.create') }}" class="btn btn-success">
+                        <i class="fas fa-plus mr-1"></i>Create First Shift
+                    </a>
+                </div>
+            @endif
+        </div>
+    </div>
+
     <div class="card shadow mb-4">
         <div class="card-body">
             <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data" id="settingsForm">

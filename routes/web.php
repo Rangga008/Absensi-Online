@@ -14,6 +14,8 @@ use App\Http\Controllers\AttendanceImportController;
 
 use App\Http\Controllers\ConcessionController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\WorkTimeController;
+use App\Models\Setting;
 
 /** Route untuk halaman welcome/landing page */
 Route::get('/', function () {
@@ -166,6 +168,21 @@ Route::prefix('admin')->middleware(['check.admin.session'])->group(function () {
         'update' => 'admin.concessions.update',
         'destroy' => 'admin.concessions.destroy'
     ]);
+
+    // Work Times (Shifts) Routes
+    Route::resource('settings/work-times', WorkTimeController::class)->names([
+        'index' => 'admin.settings.work-times.index',
+        'create' => 'admin.settings.work-times.create',
+        'store' => 'admin.settings.work-times.store',
+        'show' => 'admin.settings.work-times.show',
+        'edit' => 'admin.settings.work-times.edit',
+        'update' => 'admin.settings.work-times.update',
+        'destroy' => 'admin.settings.work-times.destroy'
+    ]);
+
+    // Additional work time routes
+    Route::patch('settings/work-times/{workTime}/toggle-status', [WorkTimeController::class, 'toggleStatus'])
+        ->name('admin.settings.work-times.toggle-status');
 
     // Export PDF route for concession
     Route::get('concessions/{id}/export-pdf', [ConcessionController::class, 'exportPdf'])
