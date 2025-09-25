@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Models\WorkTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
@@ -30,7 +31,10 @@ class SettingController extends Controller
             'kopsurat' => setting('kopsurat', null), // Added kopsurat setting
         ];
 
-        return view('admin.settings.index', compact('settings'));
+        // Get all work times for the work times management section
+        $workTimes = WorkTime::with('users')->orderBy('name')->get();
+
+        return view('admin.settings.index', compact('settings', 'workTimes'));
     }
 
     public function update(Request $request)

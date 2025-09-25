@@ -67,6 +67,14 @@ class Attendance extends Model
     }
 
     /**
+     * Relationship with WorkTime through User
+     */
+    public function shift()
+    {
+        return $this->hasOneThrough(WorkTime::class, User::class, 'id', 'id', 'user_id', 'shift_id');
+    }
+
+    /**
      * Scope for today's attendance
      */
     public function scopeToday($query)
@@ -289,26 +297,38 @@ class Attendance extends Model
     }
 
     /**
-     * Check if attendance is late (after 08:00)
+     * Check if attendance is late based on user's shift
      */
     public function isLate()
     {
         if (!$this->present_at) return false;
-        
+
+        // If user has a shift, use shift's late threshold
+        if ($this->user && $this->user->shift) {
+            return $this->user->shift->isLate($this->present_at->setTimezone('Asia/Jakarta')->format('H:i:s'));
+        }
+
+        // Fallback to global setting or default 08:00
         $attendanceTime = $this->present_at->setTimezone('Asia/Jakarta')->format('H:i:s');
         return $attendanceTime > '08:00:00';
     }
 
     /**
-     * Check if attendance is on time
+     * Check if attendance is on time based on user's shift
      */
     public function getIsOnTimeAttribute()
     {
         if (!$this->present_at) return false;
-        
+
+        // If user has a shift, use shift's late threshold
+        if ($this->user && $this->user->shift) {
+            return !$this->user->shift->isLate($this->present_at->setTimezone('Asia/Jakarta')->format('H:i:s'));
+        }
+
+        // Fallback to global setting or default 08:00
         $attendanceTime = Carbon::parse($this->present_at)->setTimezone('Asia/Jakarta');
         $lateThreshold = $attendanceTime->copy()->setTime(8, 0, 0);
-        
+
         return $attendanceTime->lte($lateThreshold);
     }
 
