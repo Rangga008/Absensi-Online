@@ -122,7 +122,7 @@
         <input type="hidden" id="user_lng" value="">
         
         <button class="btn btn-danger mt-3" id="checkout-btn" disabled>
-            <i class="fas fa-sign-out-alt"></i> Absen Keluar
+            <i class="fas fa-sign-out-alt"></i> Checkout Sekarang
         </button>
     </div>
     

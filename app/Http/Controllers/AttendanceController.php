@@ -131,7 +131,7 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
      */
      public function store(Request $request)
 {
-    Log::info('Attendance submission attempt', $request->all());
+    \Log::info('Attendance submission attempt', $request->all());
 
     $validated = $request->validate([
         'user_id' => 'required|exists:users,id',
@@ -193,7 +193,7 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
             }
             
             $photoPath = $path;
-            Log::info('Photo saved', ['path' => $photoPath]);
+            \Log::info('Photo saved', ['path' => $photoPath]);
         }
 
         // Create attendance record
@@ -220,7 +220,7 @@ private function calculateDistance($lat1, $lon1, $lat2, $lon2)
 
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('Attendance error', ['error' => $e->getMessage()]);
+        \Log::error('Attendance error', ['error' => $e->getMessage()]);
         
         // Delete the photo if it was saved but the transaction failed
         if (isset($photoPath) && Storage::disk('public')->exists($photoPath)) {
@@ -479,8 +479,6 @@ public function checkAttendanceStatus(Request $request)
                         $q->where('description', 'Hadir');
                     } elseif ($statusFilter == 'late') {
                         $q->where('description', 'Terlambat');
-                    } elseif ($statusFilter == 'checkout') {
-                        $q->where('description', 'Belum Keluar');
                     } elseif ($statusFilter == 'absent') {
                         $q->whereIn('description', ['Sakit', 'Izin']);
                     } elseif ($statusFilter == 'other') {
@@ -597,8 +595,6 @@ public function checkAttendanceStatus(Request $request)
                         $q->where('description', 'Hadir');
                     } elseif ($statusFilter == 'late') {
                         $q->where('description', 'Terlambat');
-                    } elseif ($statusFilter == 'checkout') {
-                        $q->where('description', 'Belum Keluar');
                     } elseif ($statusFilter == 'absent') {
                         $q->whereIn('description', ['Sakit', 'Izin']);
                     } elseif ($statusFilter == 'other') {
@@ -959,8 +955,6 @@ public function processExport(Request $request)
                 return 'present';
             case 'Terlambat':
                 return 'late';
-            case 'Belum Keluar':
-                return 'checkout';
             case 'Sakit':
             case 'Izin':
                 return 'absent';
@@ -971,37 +965,6 @@ public function processExport(Request $request)
                 return 'no_record';
         }
     }
-
-/**
- * Get status filter value including checkout status
- */
-public static function getStatusWithCheckoutValue($attendance)
-{
-    if (!$attendance) {
-        return 'no_record';
-    }
-
-    // Check checkout status first
-    if (!$attendance->hasCheckedOut()) {
-        return 'checkout';
-    }
-
-    // Then check attendance type
-    switch ($attendance->description) {
-        case 'Hadir':
-            return 'present'; // Ini seharusnya bekerja
-        case 'Terlambat':
-            return 'late';
-        case 'Sakit':
-        case 'Izin':
-            return 'absent';
-        case 'Dinas Luar':
-        case 'WFH':
-            return 'other';
-        default:
-            return 'present'; // Default ke present
-    }
-}
 
     /**
      * Process checkout for attendance (admin)

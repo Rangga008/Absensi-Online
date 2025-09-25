@@ -180,7 +180,7 @@
             @forelse($attendances as $index => $attendance)
             <tr>
                 <td>{{ $index + 1 }}</td>
-                <td>{{ $attendance->present_date }}</td>
+                <td>{{ $attendance->display_date }}</td>
                 <td>{{ $attendance->present_at ? $attendance->present_at->format('H:i:s') : '-' }}</td>
                 <td>
                     <span class="status-badge status-{{ strtolower(str_replace(' ', '-', $attendance->description)) }}">

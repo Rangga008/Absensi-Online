@@ -44,31 +44,6 @@
     white-space: nowrap;
     position: relative;
     background: #f8f9fa;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.2s;
-}
-
-#attendanceTable th:hover {
-    background: #e9ecef;
-}
-
-#attendanceTable th.sortable::after {
-    content: ' ⇅';
-    font-size: 0.8em;
-    opacity: 0.5;
-}
-
-#attendanceTable th.sort-asc::after {
-    content: ' ↑';
-    opacity: 1;
-    color: #007bff;
-}
-
-#attendanceTable th.sort-desc::after {
-    content: ' ↓';
-    opacity: 1;
-    color: #007bff;
 }
 
 
@@ -194,7 +169,6 @@
                         <option value="">All Status</option>
                         <option value="present">Hadir</option>
                         <option value="late">Terlambat</option>
-                        <option value="checkout">Belum Keluar</option>
                         <option value="absent">Sakit/Izin</option>
                         <option value="other">Dinas Luar/WFH</option>
                         <option value="no_record">No Record</option>
@@ -234,10 +208,7 @@
                 </thead>
                 <tbody>
                     @foreach($users as $index => $user)
-                        <tr data-user-id="{{ $user->id }}" data-role-id="{{ $user->role_id }}" 
-    data-status="{{ $user->latestAttendance ? \App\Http\Controllers\AttendanceController::getStatusWithCheckoutValue($user->latestAttendance) : 'no_record' }}" 
-    data-name="{{ $user->name }}"
-    data-debug="{{ $user->latestAttendance ? $user->latestAttendance->description . '|' . ($user->latestAttendance->hasCheckedOut() ? 'checkedout' : 'notchecked') : 'norecord' }}">
+                        <tr data-user-id="{{ $user->id }}" data-role-id="{{ $user->role_id }}" data-status="{{ $user->latestAttendance ? \App\Http\Controllers\AttendanceController::getStatusFilterValue($user->latestAttendance->description) : 'no_record' }}" data-name="{{ $user->name }}">
                             <td>{{ $users->firstItem() + $index }}</td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -339,10 +310,7 @@ function filterTable() {
     const roleFilter = document.getElementById('role_id').value;
     const statusFilter = document.getElementById('status').value;
 
-    console.log('Filtering - Search:', searchFilter, 'Role:', roleFilter, 'Status:', statusFilter);
-
     const rows = document.querySelectorAll('#attendanceTable tbody tr');
-    let visibleCount = 0;
 
     rows.forEach(row => {
         const name = row.getAttribute('data-name').toLowerCase();
@@ -351,28 +319,10 @@ function filterTable() {
 
         const searchMatch = searchFilter === '' || name.includes(searchFilter);
         const roleMatch = roleFilter === '' || roleId === roleFilter;
-        
-        // Simple status matching - fix this logic
-        let statusMatch = true;
-        if (statusFilter !== '') {
-            statusMatch = status === statusFilter;
-        }
+        const statusMatch = statusFilter === '' || status === statusFilter;
 
-        const shouldShow = searchMatch && roleMatch && statusMatch;
-        
-        if (shouldShow) {
-            visibleCount++;
-        }
-        
-        row.style.display = shouldShow ? '' : 'none';
-        
-        // Debug per row
-        if (statusFilter === 'present') {
-            console.log('Row:', name, 'Status:', status, 'Match:', statusMatch, 'Show:', shouldShow);
-        }
+        row.style.display = searchMatch && roleMatch && statusMatch ? '' : 'none';
     });
-
-    console.log('Total visible rows:', visibleCount);
 }
 
 function resetFilters() {
@@ -399,22 +349,5 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
-
-function debugStatus() {
-    console.log('=== DEBUG STATUS DATA ===');
-    const rows = document.querySelectorAll('#attendanceTable tbody tr');
-    rows.forEach(row => {
-        const name = row.querySelector('td:nth-child(2)').textContent.trim();
-        const status = row.getAttribute('data-status');
-        const debug = row.getAttribute('data-debug');
-        console.log(name, '- Status:', status, '- Debug:', debug);
-    });
-    console.log('=== END DEBUG ===');
-}
-
-// Panggil debug setelah page load
-document.addEventListener('DOMContentLoaded', function() {
-    debugStatus();
-});
 </script>
 @endif

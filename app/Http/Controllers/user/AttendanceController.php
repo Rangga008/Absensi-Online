@@ -288,7 +288,6 @@ class AttendanceController extends Controller
             'stats' => [
                 'working_days' => $workingDays,
                 'present' => $attendances->whereIn('description', ['Hadir', 'Terlambat'])->count(),
-                'checkout' => $attendances->whereIn('description', ['Sudah Keluar', 'Belum Keluar'])->count(),
                 'late' => $attendances->where('description', 'Terlambat')->count(),
                 'sick' => $attendances->where('description', 'Sakit')->count(),
                 'permission' => $attendances->where('description', 'Izin')->count(),

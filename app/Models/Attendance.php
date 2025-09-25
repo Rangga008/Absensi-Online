@@ -175,8 +175,6 @@ class Attendance extends Model
         return $this->present_date->format('Y-m-d');
     }
 
-    
-
     /**
      * Accessor for display date (formatted for UI)
      */
